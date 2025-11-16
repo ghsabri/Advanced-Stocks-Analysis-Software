@@ -1,0 +1,28 @@
+# Core Streamlit
+streamlit==1.28.0
+
+# Data Processing
+pandas==2.1.1
+numpy==1.26.0
+
+# Charting & Visualization
+plotly==5.17.0
+matplotlib==3.8.0
+
+# API & Web
+requests==2.31.0
+yfinance==0.2.31  # Yahoo Finance (free, unlimited stock data)
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Database (for future use)
+# psycopg2-binary==2.9.9  # Uncomment when adding PostgreSQL
+# supabase==1.0.4  # Uncomment when adding Supabase
+
+# Authentication (for future use)
+# streamlit-authenticator==0.2.3  # Uncomment when adding auth
+
+# Machine Learning (for AI features - Week 7-8)
+# scikit-learn==1.3.1  # Uncomment when adding ML
+# xgboost==2.0.0  # Uncomment when adding ML

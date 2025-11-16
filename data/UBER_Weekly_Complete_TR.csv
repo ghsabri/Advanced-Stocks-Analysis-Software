@@ -1,0 +1,106 @@
+Symbol,TimeFrame,Date,Close,TR_Status,TR_Status_Enhanced,RS,Chaikin_AD
+UBER,Weekly,2023-11-17,54.44,Neutral,Neutral,50.0,50.0
+UBER,Weekly,2023-11-24,55.32,Neutral Buy,Neutral Buy ↑,50.0,50.0
+UBER,Weekly,2023-12-01,57.35,Neutral,Neutral,50.0,50.0
+UBER,Weekly,2023-12-08,61.7,Neutral,Neutral,50.0,50.0
+UBER,Weekly,2023-12-15,61.86,Neutral,Neutral,52.1,50.0
+UBER,Weekly,2023-12-22,61.71,Neutral,Neutral,51.6,50.0
+UBER,Weekly,2023-12-29,61.57,Neutral,Neutral,50.8,50.0
+UBER,Weekly,2024-01-05,57.58,Neutral,Neutral,48.8,50.0
+UBER,Weekly,2024-01-12,63.2,Neutral,Neutral,50.3,50.0
+UBER,Weekly,2024-01-19,65.11,Neutral,Neutral,50.8,50.0
+UBER,Weekly,2024-01-26,65.52,Neutral,Neutral,50.4,50.0
+UBER,Weekly,2024-02-02,68.07,Neutral,Neutral,52.8,50.0
+UBER,Weekly,2024-02-09,70.91,Neutral,Neutral,49.4,100.0
+UBER,Weekly,2024-02-16,78.41,Neutral,Neutral,60.2,100.0
+UBER,Weekly,2024-02-23,78.2,Neutral,Neutral,59.3,100.0
+UBER,Weekly,2024-03-01,81.03,Neutral,Neutral,59.1,100.0
+UBER,Weekly,2024-03-08,78.7,Neutral,Neutral,55.3,94.11764705882352
+UBER,Weekly,2024-03-15,76.07,Neutral,Neutral,52.3,77.77777777777779
+UBER,Weekly,2024-03-22,80.23,Neutral,Neutral,54.2,89.47368421052632
+UBER,Weekly,2024-03-29,76.99,Neutral,Neutral,51.2,75.0
+UBER,Weekly,2024-04-05,77.16,Neutral,Neutral,54.2,80.95238095238095
+UBER,Weekly,2024-04-12,75.28,Neutral,Neutral 🔴EXIT,52.8,81.81818181818183
+UBER,Weekly,2024-04-19,69.2,Neutral Sell,Neutral Sell ↓ 🔴EXIT,49.3,60.86956521739131
+UBER,Weekly,2024-04-26,69.05,Neutral,Neutral 🔴EXIT,48.9,58.333333333333336
+UBER,Weekly,2024-05-03,69.23,Neutral,Neutral 🔴EXIT,47.9,64.0
+UBER,Weekly,2024-05-10,66.99,Neutral,Neutral 🔴EXIT,41.9,53.84615384615385
+UBER,Weekly,2024-05-17,65.67,Neutral,Neutral 🔴EXIT,45.0,48.148148148148145
+UBER,Weekly,2024-05-24,64.26,Neutral,Neutral 🔴EXIT,44.0,42.857142857142854
+UBER,Weekly,2024-05-31,64.56,Neutral,Neutral 🔴EXIT,43.5,48.275862068965516
+UBER,Weekly,2024-06-07,69.31,Neutral,Neutral 🔴EXIT,47.0,66.66666666666666
+UBER,Weekly,2024-06-14,70.06,Neutral,Neutral 🔴EXIT,48.2,64.51612903225806
+UBER,Weekly,2024-06-21,70.21,Neutral Buy,Neutral Buy ↑ 🔴EXIT,47.8,62.5
+UBER,Weekly,2024-06-28,72.68,Neutral,Neutral 🔴EXIT,50.4,84.84848484848484
+UBER,Weekly,2024-07-05,71.06,Neutral,Neutral 🔴EXIT,48.2,88.23529411764706
+UBER,Weekly,2024-07-12,72.43,Neutral,Neutral 🔴EXIT,46.5,97.14285714285714
+UBER,Weekly,2024-07-19,67.31,Neutral Sell,Neutral Sell ↓ 🔴EXIT,45.1,72.22222222222221
+UBER,Weekly,2024-07-26,64.4,Neutral,Neutral 🔴EXIT,43.2,48.64864864864865
+UBER,Weekly,2024-08-02,58.99,Strong Sell,Strong Sell ↓ 🔴EXIT,40.4,34.21052631578947
+UBER,Weekly,2024-08-09,68.54,Strong Sell,Strong Sell 🔴EXIT,47.9,74.35897435897436
+UBER,Weekly,2024-08-16,72.04,Neutral Buy,Neutral Buy ↑,48.6,90.0
+UBER,Weekly,2024-08-23,74.3,Neutral,Neutral,50.8,97.5609756097561
+UBER,Weekly,2024-08-30,73.13,Strong Buy,Strong Buy ↑ ✓ 🔵BUY,51.2,100.0
+UBER,Weekly,2024-09-06,69.58,Strong Buy,Strong Buy,47.5,93.02325581395348
+UBER,Weekly,2024-09-13,72.48,Strong Buy,Strong Buy ✓ 🔵BUY,47.7,100.0
+UBER,Weekly,2024-09-20,73.94,Strong Buy,Strong Buy ✓,46.7,100.0
+UBER,Weekly,2024-09-27,75.75,Strong Buy,Strong Buy ✓,47.5,95.65217391304348
+UBER,Weekly,2024-10-04,74.28,Strong Buy,Strong Buy ✓,48.3,100.0
+UBER,Weekly,2024-10-11,86.34,Strong Buy,Strong Buy,55.6,100.0
+UBER,Weekly,2024-10-18,79.16,Strong Buy,Strong Buy 🔴EXIT,52.8,97.95918367346938
+UBER,Weekly,2024-10-25,77.62,Strong Buy,Strong Buy 🔴EXIT,52.4,92.0
+UBER,Weekly,2024-11-01,73.25,Neutral,Neutral 🔴EXIT,52.6,86.27450980392157
+UBER,Weekly,2024-11-08,72.04,Neutral Sell,Neutral Sell ↓ 🔴EXIT,31.9,76.92307692307693
+UBER,Weekly,2024-11-15,73.25,Neutral,Neutral 🔴EXIT,50.3,86.53846153846155
+UBER,Weekly,2024-11-22,71.51,Neutral,Neutral 🔴EXIT,45.3,98.07692307692307
+UBER,Weekly,2024-11-29,71.96,Neutral,Neutral 🔴EXIT,44.5,96.15384615384616
+UBER,Weekly,2024-12-06,66.09,Neutral,Neutral 🔴EXIT,33.0,80.76923076923077
+UBER,Weekly,2024-12-13,59.93,Strong Sell,Strong Sell ↓ 🔴EXIT,24.5,25.0
+UBER,Weekly,2024-12-20,60.73,Strong Sell,Strong Sell 🔴EXIT,28.7,11.538461538461538
+UBER,Weekly,2024-12-27,61.13,Strong Sell,Strong Sell 🔴EXIT,27.5,11.538461538461538
+UBER,Weekly,2025-01-03,64.59,Strong Sell,Strong Sell 🔴EXIT,39.4,23.076923076923077
+UBER,Weekly,2025-01-10,65.97,Strong Sell,Strong Sell 🔴EXIT,38.7,17.307692307692307
+UBER,Weekly,2025-01-17,67.34,Neutral,Neutral 🔴EXIT,39.1,19.230769230769234
+UBER,Weekly,2025-01-24,68.56,Neutral Buy,Neutral Buy ↑ 🔴EXIT,39.6,28.846153846153843
+UBER,Weekly,2025-01-31,66.85,Neutral,Neutral 🔴EXIT,39.6,30.76923076923077
+UBER,Weekly,2025-02-07,74.6,Neutral,Neutral 🔴EXIT,46.8,80.76923076923077
+UBER,Weekly,2025-02-14,79.42,Strong Buy,Strong Buy ↑ 🔴EXIT,47.6,96.15384615384616
+UBER,Weekly,2025-02-21,78.89,Strong Buy,Strong Buy 🔴EXIT,48.8,90.38461538461539
+UBER,Weekly,2025-02-28,76.01,Strong Buy,Strong Buy,44.5,82.6923076923077
+UBER,Weekly,2025-03-07,76.27,Strong Buy,Strong Buy,50.6,92.3076923076923
+UBER,Weekly,2025-03-14,71.55,Strong Buy,Strong Buy 🔴EXIT,48.5,88.46153846153845
+UBER,Weekly,2025-03-21,75.84,Strong Buy,Strong Buy,51.7,98.07692307692307
+UBER,Weekly,2025-03-28,72.75,Neutral,Neutral 🔴EXIT,49.6,90.38461538461539
+UBER,Weekly,2025-04-04,64.62,Neutral Sell,Neutral Sell ↓ 🔴EXIT,45.6,63.46153846153846
+UBER,Weekly,2025-04-11,72.28,Neutral,Neutral 🔴EXIT,49.1,94.23076923076923
+UBER,Weekly,2025-04-18,75.24,Neutral Buy,Neutral Buy ↑ 🔴EXIT,58.6,96.15384615384616
+UBER,Weekly,2025-04-25,77.75,Strong Buy,Strong Buy,56.5,100.0
+UBER,Weekly,2025-05-02,84.28,Strong Buy,Strong Buy ✓ 🔵BUY,70.0,100.0
+UBER,Weekly,2025-05-09,82.81,Strong Buy,Strong Buy ✓,65.4,98.07692307692307
+UBER,Weekly,2025-05-16,91.79,Strong Buy,Strong Buy,71.8,100.0
+UBER,Weekly,2025-05-23,87.75,Strong Buy,Strong Buy,70.5,98.07692307692307
+UBER,Weekly,2025-05-30,84.16,Strong Buy,Strong Buy ✓ 🔵BUY,62.5,92.3076923076923
+UBER,Weekly,2025-06-06,85.6,Strong Buy,Strong Buy ✓,62.7,98.07692307692307
+UBER,Weekly,2025-06-13,83.93,Neutral,Neutral,61.6,88.46153846153845
+UBER,Weekly,2025-06-20,83.78,Neutral,Neutral,61.1,86.53846153846155
+UBER,Weekly,2025-06-27,91.53,Strong Buy,Strong Buy ↑,66.9,94.23076923076923
+UBER,Weekly,2025-07-04,93.63,Strong Buy,Strong Buy,71.5,98.07692307692307
+UBER,Weekly,2025-07-11,95.39,Strong Buy,Strong Buy,69.3,94.23076923076923
+UBER,Weekly,2025-07-18,90.59,Strong Buy,Strong Buy,66.2,86.53846153846155
+UBER,Weekly,2025-07-25,91.29,Strong Buy,Strong Buy,64.6,82.6923076923077
+UBER,Weekly,2025-08-01,86.91,Neutral,Neutral 🔴EXIT,64.5,73.07692307692307
+UBER,Weekly,2025-08-08,89.56,Neutral,Neutral 🔴EXIT,57.9,69.23076923076923
+UBER,Weekly,2025-08-15,92.6,Neutral,Neutral,55.6,75.0
+UBER,Weekly,2025-08-22,96.79,Strong Buy,Strong Buy ↑ ✓ 🔵BUY,59.5,86.53846153846155
+UBER,Weekly,2025-08-29,93.75,Strong Buy,Strong Buy ✓,57.7,80.76923076923077
+UBER,Weekly,2025-09-05,90.99,Neutral,Neutral,56.7,73.07692307692307
+UBER,Weekly,2025-09-12,95.89,Neutral,Neutral,61.0,90.38461538461539
+UBER,Weekly,2025-09-19,98.51,Neutral,Neutral,60.4,100.0
+UBER,Weekly,2025-09-26,98.45,Strong Buy,Strong Buy ↑ ✓ 🔵BUY,57.4,98.07692307692307
+UBER,Weekly,2025-10-03,96.6,Neutral,Neutral,60.5,94.23076923076923
+UBER,Weekly,2025-10-10,93.4,Neutral,Neutral 🔴EXIT,48.2,82.6923076923077
+UBER,Weekly,2025-10-17,92.3,Neutral Sell,Neutral Sell ↓ 🔴EXIT,49.3,65.38461538461539
+UBER,Weekly,2025-10-24,94.07,Neutral,Neutral,49.0,73.07692307692307
+UBER,Weekly,2025-10-31,96.5,Neutral Buy,Neutral Buy ↑,55.6,73.07692307692307
+UBER,Weekly,2025-11-07,91.99,Neutral Sell,Neutral Sell ↓ 🔴EXIT,54.0,46.15384615384615
+UBER,Weekly,2025-11-14,93.57,Neutral,Neutral 🔴EXIT,51.1,42.30769230769231

@@ -1,0 +1,106 @@
+Symbol,TimeFrame,Date,Close,TR_Status,TR_Status_Enhanced,RS,Chaikin_AD
+AMZN,Weekly,2023-11-17,145.18,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2023-11-24,146.74,Neutral Buy,Neutral Buy ↑,50.0,50.0
+AMZN,Weekly,2023-12-01,147.03,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2023-12-08,147.42,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2023-12-15,149.97,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2023-12-22,153.42,Neutral,Neutral,50.3,50.0
+AMZN,Weekly,2023-12-29,151.94,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2024-01-05,145.24,Neutral,Neutral,49.8,50.0
+AMZN,Weekly,2024-01-12,154.62,Neutral,Neutral,50.5,50.0
+AMZN,Weekly,2024-01-19,155.34,Neutral,Neutral,50.0,50.0
+AMZN,Weekly,2024-01-26,159.12,Neutral,Neutral,50.1,50.0
+AMZN,Weekly,2024-02-02,171.81,Neutral,Neutral,52.9,50.0
+AMZN,Weekly,2024-02-09,174.45,Neutral,Neutral,49.6,100.0
+AMZN,Weekly,2024-02-16,169.51,Neutral,Neutral,52.7,92.85714285714286
+AMZN,Weekly,2024-02-23,174.99,Neutral,Neutral,53.1,100.0
+AMZN,Weekly,2024-03-01,178.22,Neutral,Neutral,52.2,100.0
+AMZN,Weekly,2024-03-08,175.35,Neutral,Neutral,51.6,94.11764705882352
+AMZN,Weekly,2024-03-15,174.42,Neutral,Neutral,52.2,88.88888888888889
+AMZN,Weekly,2024-03-22,178.87,Neutral,Neutral,51.5,89.47368421052632
+AMZN,Weekly,2024-03-29,180.38,Neutral,Neutral,51.2,95.0
+AMZN,Weekly,2024-04-05,185.07,Neutral,Neutral,54.4,100.0
+AMZN,Weekly,2024-04-12,186.13,Neutral,Neutral,54.5,95.45454545454545
+AMZN,Weekly,2024-04-19,174.63,Neutral,Neutral,52.7,78.26086956521739
+AMZN,Weekly,2024-04-26,179.62,Neutral,Neutral,52.3,95.83333333333334
+AMZN,Weekly,2024-05-03,186.21,Neutral,Neutral,51.4,100.0
+AMZN,Weekly,2024-05-10,187.48,Neutral,Neutral,46.7,96.15384615384616
+AMZN,Weekly,2024-05-17,184.7,Neutral,Neutral,53.4,92.5925925925926
+AMZN,Weekly,2024-05-24,180.75,Neutral,Neutral,51.0,89.28571428571429
+AMZN,Weekly,2024-05-31,176.44,Neutral Sell,Neutral Sell ↓,49.0,75.86206896551724
+AMZN,Weekly,2024-06-07,184.3,Neutral Buy,Neutral Buy ↑,51.8,90.0
+AMZN,Weekly,2024-06-14,183.66,Neutral,Neutral,51.2,74.19354838709677
+AMZN,Weekly,2024-06-21,189.08,Neutral,Neutral,52.3,90.625
+AMZN,Weekly,2024-06-28,193.25,Neutral,Neutral,54.0,93.93939393939394
+AMZN,Weekly,2024-07-05,200.0,Neutral,Neutral,55.3,100.0
+AMZN,Weekly,2024-07-12,194.49,Strong Buy,Strong Buy ↑ ✓ 🔵BUY,50.8,91.42857142857143
+AMZN,Weekly,2024-07-19,183.13,Neutral,Neutral 🔴EXIT,49.6,80.55555555555556
+AMZN,Weekly,2024-07-26,182.5,Neutral Sell,Neutral Sell ↓ 🔴EXIT,49.2,75.67567567567568
+AMZN,Weekly,2024-08-02,167.9,Neutral,Neutral 🔴EXIT,43.7,52.63157894736842
+AMZN,Weekly,2024-08-09,166.94,Neutral,Neutral 🔴EXIT,43.4,82.05128205128204
+AMZN,Weekly,2024-08-16,177.06,Neutral,Neutral 🔴EXIT,46.3,95.0
+AMZN,Weekly,2024-08-23,177.04,Neutral,Neutral 🔴EXIT,45.0,82.92682926829268
+AMZN,Weekly,2024-08-30,178.5,Neutral,Neutral 🔴EXIT,47.3,97.61904761904762
+AMZN,Weekly,2024-09-06,171.39,Neutral,Neutral 🔴EXIT,48.1,79.06976744186046
+AMZN,Weekly,2024-09-13,186.49,Neutral Buy,Neutral Buy ↑,50.5,95.45454545454545
+AMZN,Weekly,2024-09-20,191.6,Neutral,Neutral,50.6,100.0
+AMZN,Weekly,2024-09-27,187.97,Neutral,Neutral,47.6,97.82608695652173
+AMZN,Weekly,2024-10-04,186.51,Neutral,Neutral,47.3,97.87234042553192
+AMZN,Weekly,2024-10-11,188.82,Strong Buy,Strong Buy ↑,45.1,100.0
+AMZN,Weekly,2024-10-18,188.99,Strong Buy,Strong Buy,47.1,100.0
+AMZN,Weekly,2024-10-25,187.83,Strong Buy,Strong Buy,47.0,100.0
+AMZN,Weekly,2024-11-01,197.93,Strong Buy,Strong Buy ✓ 🔵BUY,52.9,100.0
+AMZN,Weekly,2024-11-08,208.18,Strong Buy,Strong Buy ✓,41.6,100.0
+AMZN,Weekly,2024-11-15,202.61,Strong Buy,Strong Buy ✓,57.3,96.15384615384616
+AMZN,Weekly,2024-11-22,197.12,Strong Buy,Strong Buy ✓,52.3,94.23076923076923
+AMZN,Weekly,2024-11-29,207.89,Strong Buy,Strong Buy ✓,56.9,94.23076923076923
+AMZN,Weekly,2024-12-06,227.03,Strong Buy,Strong Buy,67.6,100.0
+AMZN,Weekly,2024-12-13,227.46,Strong Buy,Strong Buy,67.2,98.07692307692307
+AMZN,Weekly,2024-12-20,224.92,Strong Buy,Strong Buy,66.6,94.23076923076923
+AMZN,Weekly,2024-12-27,223.75,Strong Buy,Strong Buy,64.4,92.3076923076923
+AMZN,Weekly,2025-01-03,224.19,Strong Buy,Strong Buy,66.8,100.0
+AMZN,Weekly,2025-01-10,218.94,Strong Buy,Strong Buy,62.6,90.38461538461539
+AMZN,Weekly,2025-01-17,225.94,Neutral,Neutral,64.8,100.0
+AMZN,Weekly,2025-01-24,234.85,Strong Buy,Strong Buy ↑,66.6,100.0
+AMZN,Weekly,2025-01-31,237.68,Strong Buy,Strong Buy,67.1,100.0
+AMZN,Weekly,2025-02-07,229.15,Strong Buy,Strong Buy,62.3,94.23076923076923
+AMZN,Weekly,2025-02-14,228.68,Neutral,Neutral,62.1,82.6923076923077
+AMZN,Weekly,2025-02-21,216.58,Neutral Sell,Neutral Sell ↓ 🔴EXIT,56.3,75.0
+AMZN,Weekly,2025-02-28,212.28,Neutral,Neutral 🔴EXIT,51.9,76.92307692307693
+AMZN,Weekly,2025-03-07,199.25,Neutral,Neutral 🔴EXIT,50.0,67.3076923076923
+AMZN,Weekly,2025-03-14,197.95,Neutral,Neutral 🔴EXIT,50.5,71.15384615384616
+AMZN,Weekly,2025-03-21,196.21,Neutral,Neutral 🔴EXIT,49.1,76.92307692307693
+AMZN,Weekly,2025-03-28,192.72,Neutral,Neutral 🔴EXIT,48.3,61.53846153846154
+AMZN,Weekly,2025-04-04,171.0,Strong Sell,Strong Sell ↓ 🔴EXIT,45.4,50.0
+AMZN,Weekly,2025-04-11,184.87,Strong Sell,Strong Sell 🔴EXIT,46.7,59.61538461538461
+AMZN,Weekly,2025-04-18,172.61,Strong Sell,Strong Sell 🔴EXIT,44.9,50.0
+AMZN,Weekly,2025-04-25,188.99,Strong Sell,Strong Sell 🔴EXIT,45.5,63.46153846153846
+AMZN,Weekly,2025-05-02,189.98,Strong Sell,Strong Sell 🔴EXIT,45.7,80.76923076923077
+AMZN,Weekly,2025-05-09,193.06,Neutral,Neutral 🔴EXIT,45.7,94.23076923076923
+AMZN,Weekly,2025-05-16,205.59,Neutral Buy,Neutral Buy ↑ 🔴EXIT,50.4,73.07692307692307
+AMZN,Weekly,2025-05-23,200.99,Neutral,Neutral 🔴EXIT,51.6,69.23076923076923
+AMZN,Weekly,2025-05-30,205.01,Neutral,Neutral 🔴EXIT,52.2,67.3076923076923
+AMZN,Weekly,2025-06-06,213.57,Neutral,Neutral 🔴EXIT,53.2,90.38461538461539
+AMZN,Weekly,2025-06-13,212.1,Strong Buy,Strong Buy ↑ 🔴EXIT,51.0,80.76923076923077
+AMZN,Weekly,2025-06-20,209.69,Strong Buy,Strong Buy 🔴EXIT,50.0,55.769230769230774
+AMZN,Weekly,2025-06-27,223.3,Strong Buy,Strong Buy,51.1,96.15384615384616
+AMZN,Weekly,2025-07-04,223.41,Strong Buy,Strong Buy,51.1,98.07692307692307
+AMZN,Weekly,2025-07-11,225.02,Strong Buy,Strong Buy,51.4,100.0
+AMZN,Weekly,2025-07-18,226.13,Strong Buy,Strong Buy,57.1,100.0
+AMZN,Weekly,2025-07-25,231.44,Strong Buy,Strong Buy ✓ 🔵BUY,53.7,100.0
+AMZN,Weekly,2025-08-01,214.75,Strong Buy,Strong Buy 🔴EXIT,51.7,90.38461538461539
+AMZN,Weekly,2025-08-08,222.69,Strong Buy,Strong Buy,56.9,94.23076923076923
+AMZN,Weekly,2025-08-15,231.03,Strong Buy,Strong Buy ✓ 🔵BUY,55.5,98.07692307692307
+AMZN,Weekly,2025-08-22,228.84,Strong Buy,Strong Buy ✓,55.1,100.0
+AMZN,Weekly,2025-08-29,229.0,Strong Buy,Strong Buy ✓,54.5,98.07692307692307
+AMZN,Weekly,2025-09-05,232.33,Strong Buy,Strong Buy ✓,59.1,100.0
+AMZN,Weekly,2025-09-12,228.15,Strong Buy,Strong Buy ✓,51.1,90.38461538461539
+AMZN,Weekly,2025-09-19,231.48,Strong Buy,Strong Buy ✓,51.7,86.53846153846155
+AMZN,Weekly,2025-09-26,219.78,Neutral Sell,Neutral Sell ↓ 🔴EXIT,44.6,80.76923076923077
+AMZN,Weekly,2025-10-03,219.51,Neutral,Neutral 🔴EXIT,48.3,75.0
+AMZN,Weekly,2025-10-10,216.37,Neutral,Neutral 🔴EXIT,47.5,55.769230769230774
+AMZN,Weekly,2025-10-17,213.04,Neutral,Neutral 🔴EXIT,46.1,32.69230769230769
+AMZN,Weekly,2025-10-24,224.21,Neutral,Neutral,47.9,59.61538461538461
+AMZN,Weekly,2025-10-31,244.22,Neutral Buy,Neutral Buy ↑,57.8,78.84615384615384
+AMZN,Weekly,2025-11-07,244.41,Strong Buy,Strong Buy ✓ 🔵BUY,57.2,67.3076923076923
+AMZN,Weekly,2025-11-14,244.2,Strong Buy,Strong Buy ✓,55.1,59.61538461538461
