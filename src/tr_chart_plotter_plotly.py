@@ -552,6 +552,10 @@ def plot_tr_with_buy_zones_plotly(df, ticker, timeframe='Daily', figsize=(1400, 
         for idx, row in patterns.iterrows():
             pattern_name = row[pattern_col]
             
+            # Skip if pattern name is empty or just whitespace
+            if pd.isna(pattern_name) or str(pattern_name).strip() == "":
+                continue
+            
             # Add annotation for pattern
             fig.add_annotation(
                 x=row['Date'],

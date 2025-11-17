@@ -1,12 +1,8 @@
 import pandas as pd
 import numpy as np
+import warnings # to suppress Yahoo Finance warnings
 
-# Universal caching system - works everywhere
-try:
-    from universal_cache import get_stock_data, get_market_data, prewarm_cache
-    USE_UNIVERSAL_CACHE = True
-except ImportError:
-    USE_UNIVERSAL_CACHE = False
+warnings.filterwarnings('ignore',category=FutureWarning,module='yfinance')
 
 # Conditional Streamlit import - works in both app and scanner
 try:
@@ -83,33 +79,23 @@ def calculate_relative_strength_ibd(df, market_data=None):
     # FETCH MARKET DATA IF NOT PROVIDED
     if market_data is None:
         try:
+            import yfinance as yf
             from datetime import timedelta
             
             start_date = pd.to_datetime(df['Date'].min()) - timedelta(days=400)
             end_date = pd.to_datetime(df['Date'].max()) + timedelta(days=1)
             
             interval = '1d' if timeframe == 'daily' else '1wk'
+            spy = yf.Ticker('SPY')
+            market_df = spy.history(start=start_date, end=end_date, interval=interval)
             
-            # USE UNIVERSAL CACHE IF AVAILABLE
-            if USE_UNIVERSAL_CACHE:
-                market_df = get_market_data('SPY', start_date, end_date, interval)
-                if market_df is not None and not market_df.empty:
-                    market_data = market_df
-                else:
-                    return pd.Series([50] * len(df), index=df.index)
+            if not market_df.empty:
+                market_df = market_df.reset_index()
+                market_df['Date'] = pd.to_datetime(market_df['Date']).dt.date
+                market_data = market_df[['Date', 'Close']].copy()
+                print(f"   ✅ Fetched {len(market_data)} periods of S&P 500 data for RS calculation")
             else:
-                # Fallback to direct yfinance call
-                import yfinance as yf
-                spy = yf.Ticker('SPY')
-                market_df = spy.history(start=start_date, end=end_date, interval=interval)
-                
-                if not market_df.empty:
-                    market_df = market_df.reset_index()
-                    market_df['Date'] = pd.to_datetime(market_df['Date']).dt.date
-                    market_data = market_df[['Date', 'Close']].copy()
-                    print(f"   ✅ Fetched {len(market_data)} periods of S&P 500 data for RS calculation")
-                else:
-                    return pd.Series([50] * len(df), index=df.index)
+                return pd.Series([50] * len(df), index=df.index)
         except Exception as e:
             print(f"   ⚠️ Error fetching market data: {e}, using RS = 50")
             return pd.Series([50] * len(df), index=df.index)
@@ -1020,22 +1006,8 @@ def analyze_stock_complete_tr(ticker, timeframe='daily', duration_days=180, mark
     df = detect_and_adjust_splits(df)
     
     # Fetch market data for RS calculation
-    # Try to use cache if available
-    market_df = None
-    if USE_UNIVERSAL_CACHE:
-        try:
-            from universal_cache import get_stock_data
-            interval = '1d' if timeframe.lower() == 'daily' else '1wk'
-            market_df_cached = get_stock_data(market_ticker, start_date, end_date, interval)
-            if market_df_cached is not None and not market_df_cached.empty:
-                market_df = market_df_cached
-        except:
-            pass
-    
-    # Fallback to direct fetch if cache unavailable
-    if market_df is None or market_df.empty:
-        print(f"📡 Fetching {market_ticker} data for RS calculation from Yahoo Finance...")
-        market_df = yf.download(market_ticker, start=start_date, end=end_date, progress=False)
+    print(f"📡 Fetching {market_ticker} data for RS calculation from Yahoo Finance...")
+    market_df = yf.download(market_ticker, start=start_date, end=end_date, progress=False)
     
     # Handle multi-index for market data
     if market_df is not None and not market_df.empty:
@@ -1219,24 +1191,47 @@ def analyze_multiple_stocks(tickers, timeframe='daily', duration_days=180):
     
     return results
 
-
-def save_tr_results(result, output_folder='data'):
+def save_tr_results(result, output_folder='data', ticker=None, timeframe=None):
     """
-    Save TR analysis results to CSV
+    Save TR analysis results to CSV - IMPROVED VERSION with better filename
     
     Args:
         result (pd.DataFrame): TR analysis results
         output_folder (str): Folder to save results
+        ticker (str): Stock symbol (optional, will try to extract from DataFrame if None)
+        timeframe (str): Timeframe (optional, will try to extract from DataFrame if None)
     """
+    import pandas as pd
+    import os
     
-    ticker = result.iloc[0]['Symbol']
-    timeframe = result.iloc[0]['TimeFrame']
+    # Make sure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
     
-    # Save full data with TR status
+    # Get ticker - try parameter first, then DataFrame, then default
+    if ticker is None:
+        try:
+            ticker = result.iloc[0]['Symbol'] if 'Symbol' in result.columns else None
+        except:
+            ticker = None
+    
+    if ticker is None:
+        ticker = 'Stock'  # Default fallback
+    
+    # Get timeframe - try parameter first, then DataFrame, then default
+    if timeframe is None:
+        try:
+            timeframe = result.iloc[0]['TimeFrame'] if 'TimeFrame' in result.columns else None
+        except:
+            timeframe = None
+    
+    if timeframe is None:
+        timeframe = 'Daily'  # Default fallback
+    
+    # Create filename
     filename = f"{output_folder}/{ticker}_{timeframe.capitalize()}_Complete_TR.csv"
     
-    # Select relevant columns
-    output_columns = [
+    # Select relevant columns - only include columns that actually exist
+    desired_columns = [
         'Symbol', 'TimeFrame', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
         'EMA_3', 'EMA_9', 'EMA_20', 'EMA_34',
         'PPO_Line', 'PPO_Signal', 
@@ -1250,14 +1245,51 @@ def save_tr_results(result, output_folder='data'):
         'Buy_Signal', 'Exit_Signal', 'Exit_Reason'
     ]
     
-    # Only include columns that exist
-    existing_columns = [col for col in output_columns if col in result.columns]
+    # Only include columns that exist in the DataFrame
+    existing_columns = [col for col in desired_columns if col in result.columns]
     
-    df_output = result[existing_columns]
-    # CRITICAL: Fix dtypes before saving to prevent apostrophe issue!
-    df_output = fix_all_numeric_dtypes_before_save(df_output)
-    df_output.to_csv(filename, index=False, float_format='%.6f')
+    if not existing_columns:
+        # If no columns match, just save everything
+        df_output = result.copy()
+    else:
+        df_output = result[existing_columns].copy()
     
-    print(f"✅ Saved TR results to: {filename}")
+    # Add Symbol and TimeFrame columns if they don't exist
+    if 'Symbol' not in df_output.columns:
+        df_output.insert(0, 'Symbol', ticker)
     
-    return filename
+    if 'TimeFrame' not in df_output.columns:
+        df_output.insert(1, 'TimeFrame', timeframe.capitalize())
+    
+    # Fix numeric dtypes before saving
+    numeric_columns = [
+        'Open', 'High', 'Low', 'Close', 'Volume',
+        'EMA_3', 'EMA_9', 'EMA_20', 'EMA_34',
+        'PPO_Line', 'PPO_Signal', 'PPO_Histogram',
+        'PMO_Line', 'PMO_Signal',
+        'RS', 'Chaikin_AD',
+        'Buy_Point', 'Buy_Zone_Lower', 'Buy_Zone_Upper',
+        'Stop_Loss', 'Risk_Per_Share', 'Distance_From_BP'
+    ]
+    
+    for col in numeric_columns:
+        if col in df_output.columns:
+            df_output[col] = pd.to_numeric(df_output[col], errors='coerce')
+    
+    # Save to CSV
+    try:
+        df_output.to_csv(filename, index=False, float_format='%.6f')
+        print(f"✅ Saved TR results to: {filename}")
+        return filename
+    except Exception as e:
+        print(f"⚠️ Error saving CSV: {e}")
+        # Try alternative filename
+        try:
+            alt_filename = f"{output_folder}/TR_Analysis_{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            df_output.to_csv(alt_filename, index=False, float_format='%.6f')
+            print(f"✅ Saved TR results to: {alt_filename}")
+            return alt_filename
+        except Exception as e2:
+            print(f"❌ Could not save CSV: {e2}")
+            return None
+

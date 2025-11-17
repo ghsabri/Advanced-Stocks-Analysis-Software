@@ -1,6 +1,6 @@
 """
-Stock Analysis Page - SIMPLIFIED VERSION
-Works around import issues by loading modules directly
+Stock Analysis Page - FIXED VERSION
+Properly handles data source selection and shows real errors
 """
 
 import streamlit as st
@@ -123,6 +123,13 @@ if analyze_button and symbol:
         - tr_enhanced.py  ← MAKE SURE THIS EXISTS!
         - tr_analyzer.py
         """)
+        
+        # SHOW DETAILED ERROR for debugging
+        with st.expander("🔍 Show detailed import error"):
+            st.exception(e)
+            st.code(f"sys.path includes: {src_path}")
+            st.code(f"Files in src: {os.listdir(src_path) if os.path.exists(src_path) else 'DIR NOT FOUND'}")
+        
         st.stop()
     
     if not TR_AVAILABLE:
@@ -135,7 +142,7 @@ if analyze_button and symbol:
            - tr_indicator.py
            - tr_analyzer.py
         
-        2. Restart Streamlit (Ctrl+C, then `streamlit run app.py`)
+        2. Restart Streamlit (Ctrl+C, then `streamlit run Home.py`)
         """)
         st.stop()
     
@@ -143,6 +150,10 @@ if analyze_button and symbol:
     with st.spinner(f"🔄 Analyzing {symbol}..."):
         
         try:
+            # Get the selected data source from session state
+            selected_source = st.session_state.get('api_source', 'Yahoo Finance')
+            st.info(f"📡 Fetching data using: **{selected_source}**")
+            
             # Call TR ENHANCED analyzer for full analysis with buy points and stop loss
             result_df = tr_enhanced.analyze_stock_complete_tr(
                 ticker=symbol,
@@ -150,8 +161,17 @@ if analyze_button and symbol:
                 duration_days=duration_days
             )
             
-            if result_df is None:
-                st.error(f"❌ Could not analyze {symbol}. Please check the symbol and try again.")
+            if result_df is None or result_df.empty:
+                st.error(f"❌ Could not analyze {symbol}.")
+                st.error("**Possible reasons:**")
+                st.markdown("""
+                1. Invalid stock symbol
+                2. No data available for the selected timeframe
+                3. API connection issue
+                4. Data source is down
+                """)
+                st.info(f"💡 Current data source: **{selected_source}**")
+                st.info("Try switching data sources in the sidebar if one isn't working.")
                 st.stop()
             
             # Convert to result format expected by the page
@@ -188,8 +208,13 @@ if analyze_button and symbol:
                 if not os.path.exists(data_folder):
                     os.makedirs(data_folder)
                 
-                csv_filename = tr_enhanced.save_tr_results(result_df)
-                st.info(f"💾 Full analysis saved to: `{csv_filename}`")
+                # Pass ticker and timeframe to ensure proper filename
+                csv_filename = tr_enhanced.save_tr_results(
+                    result_df, 
+                    ticker=symbol,  # Pass the stock symbol
+                    timeframe=timeframe  # Pass the timeframe
+                )
+                st.success(f"💾 Full analysis saved to: `{csv_filename}`")
             except Exception as save_error:
                 st.warning(f"⚠️ Could not save CSV file: {save_error}")
             
@@ -210,14 +235,9 @@ if analyze_button and symbol:
             with col3:
                 status = result['latest_tr_status']
                 
-                # Check if enhanced status is available
-                if 'TR_Status_Enhanced' in result.get('full_data', pd.DataFrame()).columns:
-                    enhanced_status = result['full_data'].iloc[-1]['TR_Status_Enhanced']
-                    display_status = enhanced_status
-                else:
-                    display_status = status
+                # Map 6-stage status to display format
+                display_status = status
                 
-                # Color-code the status
                 if "Strong Buy" in display_status:
                     st.success(f"🟢 {display_status}")
                     st.caption("Stage 3 Uptrend")
@@ -227,6 +247,9 @@ if analyze_button and symbol:
                 elif "Neutral Buy" in display_status:
                     st.warning(f"🟡 {display_status}")
                     st.caption("Stage 1 Uptrend")
+                elif "Neutral" in display_status and "Buy" not in display_status and "Sell" not in display_status:
+                    st.info(f"⚪ {display_status}")
+                    st.caption("Neutral/Consolidation")
                 elif "Neutral Sell" in display_status:
                     st.warning(f"🟡 {display_status}")
                     st.caption("Stage 1 Downtrend")
@@ -313,7 +336,7 @@ if analyze_button and symbol:
                         st.write(f"**{signal}**: {count} days ({percentage:.1f}%)")
                         st.progress(percentage / 100)
             
-            with tab2:
+            with tab3:
                 st.markdown("### Recent Signals (Last 10 Days)")
                 recent_df = result['recent_signals'].copy()
                 
@@ -375,9 +398,20 @@ if analyze_button and symbol:
                     st.info("🔔 Alert feature coming soon!")
         
         except Exception as e:
-            st.error(f"❌ Error analyzing {symbol}: {str(e)}")
-            with st.expander("Show full error"):
+            st.error(f"❌ Error analyzing {symbol}")
+            st.error(f"**Error message:** {str(e)}")
+            
+            # DETAILED ERROR DISPLAY - This is the key improvement!
+            with st.expander("🔍 Show full error details (for debugging)"):
                 st.exception(e)
+                st.markdown("**Troubleshooting tips:**")
+                st.markdown("""
+                1. Check if the stock symbol is valid
+                2. Try switching data sources in the sidebar
+                3. Check your internet connection
+                4. Make sure all required Python packages are installed
+                5. Restart Streamlit if the issue persists
+                """)
 
 elif analyze_button and not symbol:
     st.warning("⚠️ Please enter a stock symbol")
@@ -389,7 +423,7 @@ else:
     
     Enter a stock symbol above to get started with:
     - **TR Indicator Analysis**: Our proprietary trend recognition algorithm
-    - **6-Stage Classification**: Strong Buy, Buy, Neutral Buy, Neutral Sell, Sell, Strong Sell
+    - **6-Stage Classification**: Strong Buy, Buy, Neutral Buy, Neutral, Neutral Sell, Sell, Strong Sell
     - **Technical Indicators**: EMAs, PPO, PMO and more
     - **Signal Distribution**: See how the stock has performed over time
     
