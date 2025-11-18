@@ -1,24 +1,6 @@
 import pandas as pd
 import numpy as np
-import warnings # to suppress Yahoo Finance warnings
-
-warnings.filterwarnings('ignore',category=FutureWarning,module='yfinance')
-
-# Conditional Streamlit import - works in both app and scanner
-try:
-    import streamlit as st
-    IN_STREAMLIT = True
-except ImportError:
-    IN_STREAMLIT = False
-    # Create dummy st object for when running outside Streamlit
-    class DummyStreamlit:
-        @staticmethod
-        def cache_data(*args, **kwargs):
-            def decorator(func):
-                return func
-            return decorator
-    st = DummyStreamlit()
-
+import streamlit as st
 from tr_calculations import (
     calculate_ema, 
     calculate_ppo, 
@@ -942,61 +924,22 @@ def analyze_stock_complete_tr(ticker, timeframe='daily', duration_days=180, mark
         timeframe (str): 'daily' or 'weekly'
         duration_days (int): History duration
         market_ticker (str): Market index for RS calculation
-        api_source (str): 'yahoo' or 'tiingo' (Note: currently uses yahoo regardless)
+        api_source (str): 'yahoo' or 'tiingo' - data source
     
     Returns:
         pd.DataFrame: Complete TR analysis
     """
-    import yfinance as yf
-    from datetime import datetime, timedelta
+    from stock_data_formatter import get_stock_data_formatted
     from tr_indicator import analyze_tr_indicator
     
     print(f"\n{'='*80}")
     print(f"🔍 COMPLETE TR ANALYSIS: {ticker}")
-    print(f"📡 Data Source: YAHOO FINANCE")
+    print(f"📡 Data Source: {api_source.upper()}")
     print(f"{'='*80}\n")
     
-    # Calculate date range
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=duration_days)
-    
-    # Fetch stock data using yfinance directly
-    print(f"📡 Fetching {ticker} data from Yahoo Finance...")
-    df = yf.download(ticker, start=start_date, end=end_date, progress=False)
-    
-    if df is None or df.empty:
-        print(f"❌ No data for {ticker}")
-        return None
-    
-    # Handle multi-index columns (yfinance sometimes returns these)
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    
-    # CRITICAL: yfinance returns DatetimeIndex
-    # Reset to create Date column - DO NOT set back as index
-    df = df.reset_index()
-    if 'index' in df.columns:
-        df = df.rename(columns={'index': 'Date'})
-    
-    # Ensure Date column exists and is datetime type
-    if 'Date' not in df.columns:
-        df['Date'] = df.index
-    df['Date'] = pd.to_datetime(df['Date'])
-    
-    # Resample to weekly if needed
-    if timeframe.lower() == 'weekly':
-        print(f"📊 Converting to weekly timeframe...")
-        df = df.set_index('Date')
-        df = df.resample('W').agg({
-            'Open': 'first',
-            'High': 'max',
-            'Low': 'min',
-            'Close': 'last',
-            'Volume': 'sum'
-        }).dropna()
-        # Reset index to column
-        df = df.reset_index()
-        df['Date'] = pd.to_datetime(df['Date'])
+    # Fetch stock data
+    print(f"📡 Fetching {ticker} data from {api_source}...")
+    df = get_stock_data_formatted(ticker, timeframe=timeframe, days=duration_days, save=False)
     
     if df is None or df.empty:
         print(f"❌ No data for {ticker}")
@@ -1006,38 +949,11 @@ def analyze_stock_complete_tr(ticker, timeframe='daily', duration_days=180, mark
     df = detect_and_adjust_splits(df)
     
     # Fetch market data for RS calculation
-    print(f"📡 Fetching {market_ticker} data for RS calculation from Yahoo Finance...")
-    market_df = yf.download(market_ticker, start=start_date, end=end_date, progress=False)
+    print(f"📡 Fetching {market_ticker} data for RS calculation from {api_source}...")
+    market_df = get_stock_data_formatted(market_ticker, timeframe=timeframe, days=duration_days, save=False,)
     
-    # Handle multi-index for market data
+    # Adjust market data for splits too
     if market_df is not None and not market_df.empty:
-        if isinstance(market_df.columns, pd.MultiIndex):
-            market_df.columns = market_df.columns.get_level_values(0)
-        
-        # Reset index to create Date column
-        market_df = market_df.reset_index()
-        if 'index' in market_df.columns:
-            market_df = market_df.rename(columns={'index': 'Date'})
-        
-        # Ensure Date exists and is datetime
-        if 'Date' not in market_df.columns:
-            market_df['Date'] = market_df.index
-        market_df['Date'] = pd.to_datetime(market_df['Date'])
-        
-        # Resample market data to weekly if needed
-        if timeframe.lower() == 'weekly':
-            market_df = market_df.set_index('Date')
-            market_df = market_df.resample('W').agg({
-                'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum'
-            }).dropna()
-            market_df = market_df.reset_index()
-            market_df['Date'] = pd.to_datetime(market_df['Date'])
-        
-        # Adjust market data for splits too
         market_df = detect_and_adjust_splits(market_df)
     
     # Run base TR analysis
@@ -1191,47 +1107,24 @@ def analyze_multiple_stocks(tickers, timeframe='daily', duration_days=180):
     
     return results
 
-def save_tr_results(result, output_folder='data', ticker=None, timeframe=None):
+
+def save_tr_results(result, output_folder='data'):
     """
-    Save TR analysis results to CSV - IMPROVED VERSION with better filename
+    Save TR analysis results to CSV
     
     Args:
         result (pd.DataFrame): TR analysis results
         output_folder (str): Folder to save results
-        ticker (str): Stock symbol (optional, will try to extract from DataFrame if None)
-        timeframe (str): Timeframe (optional, will try to extract from DataFrame if None)
     """
-    import pandas as pd
-    import os
     
-    # Make sure output folder exists
-    os.makedirs(output_folder, exist_ok=True)
+    ticker = result.iloc[0]['Symbol']
+    timeframe = result.iloc[0]['TimeFrame']
     
-    # Get ticker - try parameter first, then DataFrame, then default
-    if ticker is None:
-        try:
-            ticker = result.iloc[0]['Symbol'] if 'Symbol' in result.columns else None
-        except:
-            ticker = None
-    
-    if ticker is None:
-        ticker = 'Stock'  # Default fallback
-    
-    # Get timeframe - try parameter first, then DataFrame, then default
-    if timeframe is None:
-        try:
-            timeframe = result.iloc[0]['TimeFrame'] if 'TimeFrame' in result.columns else None
-        except:
-            timeframe = None
-    
-    if timeframe is None:
-        timeframe = 'Daily'  # Default fallback
-    
-    # Create filename
+    # Save full data with TR status
     filename = f"{output_folder}/{ticker}_{timeframe.capitalize()}_Complete_TR.csv"
     
-    # Select relevant columns - only include columns that actually exist
-    desired_columns = [
+    # Select relevant columns
+    output_columns = [
         'Symbol', 'TimeFrame', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
         'EMA_3', 'EMA_9', 'EMA_20', 'EMA_34',
         'PPO_Line', 'PPO_Signal', 
@@ -1245,51 +1138,14 @@ def save_tr_results(result, output_folder='data', ticker=None, timeframe=None):
         'Buy_Signal', 'Exit_Signal', 'Exit_Reason'
     ]
     
-    # Only include columns that exist in the DataFrame
-    existing_columns = [col for col in desired_columns if col in result.columns]
+    # Only include columns that exist
+    existing_columns = [col for col in output_columns if col in result.columns]
     
-    if not existing_columns:
-        # If no columns match, just save everything
-        df_output = result.copy()
-    else:
-        df_output = result[existing_columns].copy()
+    df_output = result[existing_columns]
+    # CRITICAL: Fix dtypes before saving to prevent apostrophe issue!
+    df_output = fix_all_numeric_dtypes_before_save(df_output)
+    df_output.to_csv(filename, index=False, float_format='%.6f')
     
-    # Add Symbol and TimeFrame columns if they don't exist
-    if 'Symbol' not in df_output.columns:
-        df_output.insert(0, 'Symbol', ticker)
+    print(f"✅ Saved TR results to: {filename}")
     
-    if 'TimeFrame' not in df_output.columns:
-        df_output.insert(1, 'TimeFrame', timeframe.capitalize())
-    
-    # Fix numeric dtypes before saving
-    numeric_columns = [
-        'Open', 'High', 'Low', 'Close', 'Volume',
-        'EMA_3', 'EMA_9', 'EMA_20', 'EMA_34',
-        'PPO_Line', 'PPO_Signal', 'PPO_Histogram',
-        'PMO_Line', 'PMO_Signal',
-        'RS', 'Chaikin_AD',
-        'Buy_Point', 'Buy_Zone_Lower', 'Buy_Zone_Upper',
-        'Stop_Loss', 'Risk_Per_Share', 'Distance_From_BP'
-    ]
-    
-    for col in numeric_columns:
-        if col in df_output.columns:
-            df_output[col] = pd.to_numeric(df_output[col], errors='coerce')
-    
-    # Save to CSV
-    try:
-        df_output.to_csv(filename, index=False, float_format='%.6f')
-        print(f"✅ Saved TR results to: {filename}")
-        return filename
-    except Exception as e:
-        print(f"⚠️ Error saving CSV: {e}")
-        # Try alternative filename
-        try:
-            alt_filename = f"{output_folder}/TR_Analysis_{ticker}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            df_output.to_csv(alt_filename, index=False, float_format='%.6f')
-            print(f"✅ Saved TR results to: {alt_filename}")
-            return alt_filename
-        except Exception as e2:
-            print(f"❌ Could not save CSV: {e2}")
-            return None
-
+    return filename

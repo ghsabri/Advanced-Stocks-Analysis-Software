@@ -27,6 +27,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+# TEMPORARY CLEANUP FUNCTION - Add after imports, before main()
+def cleanup_duplicate_watchlists():
+    """Remove all View1 duplicates"""
+    if 'watchlists' in st.session_state:
+        to_delete = []
+        for wl_id, wl_data in st.session_state.watchlists.items():
+            if wl_data['name'] == 'View1':
+                to_delete.append(wl_id)
+        
+        for wl_id in to_delete:
+            del st.session_state.watchlists[wl_id]
+        
+        if to_delete:
+            st.sidebar.info(f"🧹 Cleaned up {len(to_delete)} duplicate watchlists")
+
+
 # Add src directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -381,8 +397,7 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
             ticker=symbol,
             duration_days=1825,  # 5 years (365 * 5)
             timeframe='daily',
-            api_source=data_source,
-            include_tr=needs_tr  # Only calculate TR if needed! ✅
+            api_source=data_source           
         )
         
         if df is None or df.empty:
@@ -658,20 +673,59 @@ def show_watchlist_selector():
     
     st.sidebar.divider()
 
+def _on_create_watchlist():
+    """Callback function when Create button is clicked"""
+    name = st.session_state.get('new_watchlist_name_input', '').strip()
+    
+    if name:
+        # Create the watchlist
+        watchlist_id = st.session_state.next_watchlist_id
+        st.session_state.watchlists[watchlist_id] = {
+            'name': name,
+            'created_at': datetime.now(),
+            'stocks': [],
+            'data_source': 'yahoo'
+        }
+        st.session_state.next_watchlist_id += 1
+        st.session_state.active_watchlist = watchlist_id
+        st.session_state.watchlist_view_prefs[watchlist_id] = 'Standard'
+        
+        # Clear the input
+        st.session_state.new_watchlist_name_input = ""
+        
+        # Set success flag
+        st.session_state.watchlist_created = True
+    else:
+        st.session_state.watchlist_error = True
+
+
 def show_create_watchlist_form():
     """Show form to create a new watchlist"""
     st.sidebar.subheader("➕ Create New Watchlist")
     
-    with st.sidebar.form("create_watchlist_form"):
-        new_name = st.text_input("Watchlist Name", placeholder="e.g., Tech Stocks")
-        submit = st.form_submit_button("Create Watchlist")
-        
-        if submit and new_name:
-            wl_id = create_watchlist(new_name.strip())
-            st.success(f"✅ Created watchlist: {new_name}")
-            st.rerun()
-        elif submit:
-            st.error("Please enter a name for the watchlist")
+    # Show success/error messages
+    if st.session_state.get('watchlist_created', False):
+        st.sidebar.success("✅ Watchlist created!")
+        st.session_state.watchlist_created = False
+    
+    if st.session_state.get('watchlist_error', False):
+        st.sidebar.error("❌ Please enter a name")
+        st.session_state.watchlist_error = False
+    
+    # Input field
+    st.sidebar.text_input(
+        "Watchlist Name",
+        placeholder="e.g., Tech Stocks",
+        key="new_watchlist_name_input"
+    )
+    
+    # Create button with callback
+    st.sidebar.button(
+        "Create Watchlist",
+        key="create_watchlist_btn",
+        on_click=_on_create_watchlist,
+        use_container_width=True
+    )
 
 def show_add_stock_form(watchlist_id):
     """Show form to add stocks - supports bulk addition"""
@@ -694,6 +748,17 @@ def show_add_stock_form(watchlist_id):
         add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}")
     
     if add_button and new_symbols:
+        # Create unique key for this button click
+        button_click_key = f"add_button_clicked_{watchlist_id}_{new_symbols}"
+        
+        # Check if we already processed this exact button click
+        if st.session_state.get(button_click_key, False):
+            # Already processed, skip
+            return
+        
+        # Mark as processed
+        st.session_state[button_click_key] = True
+        
         symbols_list = [s.strip().upper() for s in new_symbols.split(',') if s.strip()]
         
         if not symbols_list:
@@ -740,6 +805,7 @@ def show_add_stock_form(watchlist_id):
         if invalid:
             st.error(f"❌ Invalid symbol(s) ({len(invalid)}): {', '.join(invalid)}")
         
+        # Only return if stocks were actually added
         if added:
             st.rerun()
     
@@ -1345,6 +1411,27 @@ def main():
         return
     
     initialize_session_state()
+   # ONE-TIME CLEANUP - DELETE ALL View1 DUPLICATES
+    if 'cleanup_done' not in st.session_state:
+        st.session_state.cleanup_done = False
+
+    if not st.session_state.cleanup_done:
+        # Delete all View1 watchlists
+        to_delete = []
+        for wl_id, wl_data in list(st.session_state.watchlists.items()):
+            if wl_data.get('name') == 'View1':
+                to_delete.append(wl_id)
+    
+        for wl_id in to_delete:
+            del st.session_state.watchlists[wl_id]
+            if wl_id in st.session_state.watchlist_view_prefs:
+                del st.session_state.watchlist_view_prefs[wl_id]
+    
+        st.session_state.active_watchlist = None
+        st.session_state.cleanup_done = True
+    
+        if to_delete:
+            st.rerun()
     
     st.title("📋 Watchlists")
     st.markdown("*Create and manage stock watchlists with **22 available fields** and custom views*")
@@ -1387,8 +1474,8 @@ def main():
                 st.caption(f"Created: {watchlist['created_at'].strftime('%B %d, %Y')}")
             
             with col2:
-                with st.popover("⚙️ Settings"):
-                    new_name = st.text_input("Rename Watchlist", value=watchlist['name'])
+                with st.expander("⚙️ Settings"):
+                    new_name = st.text_input("Rename Watchlist", value=watchlist['name'], key=f"rename_{watchlist['name']}")
                     
                     # Data source selector
                     current_source = watchlist.get('data_source', 'yahoo')
@@ -1396,10 +1483,11 @@ def main():
                         "Data Source",
                         ["yahoo", "tiingo"],
                         index=0 if current_source == 'yahoo' else 1,
-                        help="Yahoo: Free, Tiingo: More reliable ($50/month)"
+                        help="Yahoo: Free, Tiingo: More reliable ($50/month)",
+                        key=f"data_source_{st.session_state.active_watchlist}"
                     )
                     
-                    if st.button("Save Settings"):
+                    if st.button("Save Settings", key=f"save_settings_{st.session_state.active_watchlist}"):
                         rename_watchlist(st.session_state.active_watchlist, new_name)
                         st.session_state.watchlists[st.session_state.active_watchlist]['data_source'] = data_source
                         # Clear cache when data source changes
