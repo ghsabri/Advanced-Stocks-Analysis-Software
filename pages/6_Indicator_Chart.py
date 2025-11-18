@@ -20,6 +20,7 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from cached_data import get_shared_stock_data
+from ml_ichimoku_predictor import predict_ichimoku_confidence
 
 st.set_page_config(
     page_title="Indicator Chart - MJ Software",
@@ -371,6 +372,81 @@ def find_ichimoku_signals(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30)
                         sell_signals.append(i)
     
     return buy_signals, sell_signals
+
+
+def get_ml_confidence_for_signals(df, buy_signals, sell_signals, ema_13, ema_30, ema_200, senkou_a, senkou_b):
+    """Get ML confidence scores for detected Ichimoku signals."""
+    buy_predictions = []
+    sell_predictions = []
+    
+    for idx in buy_signals:
+        try:
+            entry_price = float(df['Close'].iloc[idx])
+            ema13_val = float(ema_13.iloc[idx])
+            ema30_val = float(ema_30.iloc[idx])
+            ema200_val = float(ema_200.iloc[idx])
+            cloud_top = max(float(senkou_a.iloc[idx]), float(senkou_b.iloc[idx]))
+            cloud_bottom = min(float(senkou_a.iloc[idx]), float(senkou_b.iloc[idx]))
+            
+            if entry_price > cloud_top:
+                price_position = 'above'
+            elif entry_price < cloud_bottom:
+                price_position = 'below'
+            else:
+                price_position = 'inside'
+            
+            signal_data = {
+                'entry_price': entry_price,
+                'ema_13': ema13_val,
+                'ema_30': ema30_val,
+                'ema_200': ema200_val,
+                'cloud_top': cloud_top,
+                'cloud_bottom': cloud_bottom,
+                'price_position': price_position,
+                'timeframe': 'Daily'
+            }
+            
+            prediction = predict_ichimoku_confidence(signal_data)
+            buy_predictions.append((idx, prediction))
+        except:
+            continue
+    
+    for idx in sell_signals:
+        try:
+            entry_price = float(df['Close'].iloc[idx])
+            ema13_val = float(ema_13.iloc[idx])
+            ema30_val = float(ema_30.iloc[idx])
+            ema200_val = float(ema_200.iloc[idx])
+            cloud_top = max(float(senkou_a.iloc[idx]), float(senkou_b.iloc[idx]))
+            cloud_bottom = min(float(senkou_a.iloc[idx]), float(senkou_b.iloc[idx]))
+            
+            if entry_price > cloud_top:
+                price_position = 'above'
+            elif entry_price < cloud_bottom:
+                price_position = 'below'
+            else:
+                price_position = 'inside'
+            
+            signal_data = {
+                'entry_price': entry_price,
+                'ema_13': ema13_val,
+                'ema_30': ema30_val,
+                'ema_200': ema200_val,
+                'cloud_top': cloud_top,
+                'cloud_bottom': cloud_bottom,
+                'price_position': price_position,
+                'timeframe': 'Daily'
+            }
+            
+            prediction = predict_ichimoku_confidence(signal_data)
+            sell_predictions.append((idx, prediction))
+        except:
+            continue
+    
+    return {
+        'buy_predictions': buy_predictions,
+        'sell_predictions': sell_predictions
+    }
 
 
 # ============================================================================
@@ -1118,7 +1194,7 @@ def create_macd_chart(df, macd_line, signal_line, histogram, buy_signals, sell_s
     return fig
 
 
-def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30, buy_signals, sell_signals, timeframe="Daily"):
+def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30, buy_signals, sell_signals, timeframe="Daily", ml_results=None):
     """
     Create single-panel chart for Ichimoku Cloud with EMAs and signals
     
@@ -1313,6 +1389,85 @@ def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30,
             ),
             hovertemplate='SELL<br>$%{y:.2f}<extra></extra>'
         ))
+    
+    # ========================================================================
+    # ML CONFIDENCE ANNOTATIONS
+    # ========================================================================
+    
+    if ml_results:
+        # Buy signal annotations
+        if ml_results.get('buy_predictions'):
+            for idx, prediction in ml_results['buy_predictions']:
+                if idx in buy_signals:
+                    try:
+                        signal_date = dates[idx]
+                        signal_price = df['Close'].iloc[idx]
+                        confidence = prediction['confidence_pct']
+                        level = prediction['confidence_level']
+                        
+                        if confidence >= 75:
+                            conf_color = 'darkgreen'
+                        elif confidence >= 60:
+                            conf_color = 'orange'
+                        else:
+                            conf_color = 'red'
+                        
+                        fig.add_annotation(
+                            x=signal_date,
+                            y=signal_price * 1.02,
+                            text=f"🤖 {confidence:.0f}%<br>{level}",
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=1.5,
+                            arrowcolor=conf_color,
+                            ax=0,
+                            ay=-30,
+                            font=dict(size=10, color=conf_color),
+                            bgcolor='white',
+                            bordercolor=conf_color,
+                            borderwidth=2,
+                            borderpad=4
+                        )
+                    except:
+                        continue
+        
+        # Sell signal annotations
+        if ml_results.get('sell_predictions'):
+            for idx, prediction in ml_results['sell_predictions']:
+                if idx in sell_signals:
+                    try:
+                        signal_date = dates[idx]
+                        signal_price = df['Close'].iloc[idx]
+                        confidence = prediction['confidence_pct']
+                        level = prediction['confidence_level']
+                        
+                        if confidence >= 75:
+                            conf_color = 'darkred'
+                        elif confidence >= 60:
+                            conf_color = 'orange'
+                        else:
+                            conf_color = 'gray'
+                        
+                        fig.add_annotation(
+                            x=signal_date,
+                            y=signal_price * 0.98,
+                            text=f"🤖 {confidence:.0f}%<br>{level}",
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=1.5,
+                            arrowcolor=conf_color,
+                            ax=0,
+                            ay=30,
+                            font=dict(size=10, color=conf_color),
+                            bgcolor='white',
+                            bordercolor=conf_color,
+                            borderwidth=2,
+                            borderpad=4
+                        )
+                    except:
+                        continue
     
     # ========================================================================
     # LAYOUT
@@ -2239,6 +2394,20 @@ if update_button:
                     df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30
                 )
                 
+                # Get ML confidence scores for signals
+                try:
+                    ema_200 = calculate_ema(df, 200)
+                    ml_results = get_ml_confidence_for_signals(
+                        df, buy_signals, sell_signals, 
+                        ema_13, ema_30, ema_200,
+                        senkou_a, senkou_b
+                    )
+                    # st.write(f"DEBUG: ML Results = {ml_results}")  # ADD THIS LINE
+
+                except Exception as e:
+                    st.warning(f"⚠️ ML predictions unavailable: {str(e)}")
+                    ml_results = {'buy_predictions': [], 'sell_predictions': []}
+                
                 # Create Ichimoku chart (single panel)
                 fig = create_ichimoku_chart(
                     df=df,
@@ -2250,7 +2419,8 @@ if update_button:
                     ema_30=ema_30,
                     buy_signals=buy_signals,
                     sell_signals=sell_signals,
-                    timeframe=timeframe
+                    timeframe=timeframe,
+                    ml_results=ml_results
                 )
                 
             elif params.get('has_signals', False):
