@@ -748,17 +748,6 @@ def show_add_stock_form(watchlist_id):
         add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}")
     
     if add_button and new_symbols:
-        # Create unique key for this button click
-        button_click_key = f"add_button_clicked_{watchlist_id}_{new_symbols}"
-        
-        # Check if we already processed this exact button click
-        if st.session_state.get(button_click_key, False):
-            # Already processed, skip
-            return
-        
-        # Mark as processed
-        st.session_state[button_click_key] = True
-        
         symbols_list = [s.strip().upper() for s in new_symbols.split(',') if s.strip()]
         
         if not symbols_list:
@@ -1007,6 +996,37 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     
     with col2:
         clear_cache = st.button("🗑️ Clear Cache", key=f"clear_cache_{watchlist_id}")
+        
+        if clear_cache:
+            # Clear the universal cache (pickle files)
+            from pathlib import Path
+            
+            # Cache is in src/.stock_cache
+            src_dir = Path(__file__).parent.parent / 'src'
+            cache_dir = src_dir / '.stock_cache'
+            
+            if cache_dir.exists():
+                count = 0
+                files_found = list(cache_dir.glob('*.pkl'))
+                
+                for cache_file in files_found:
+                    try:
+                        cache_file.unlink()
+                        count += 1
+                    except Exception as e:
+                        st.error(f"Error deleting cache: {e}")
+                
+                if count > 0:
+                    st.success(f"✅ Cleared {count} cached files")
+                else:
+                    st.info("Cache is already empty")
+            else:
+                st.info("Cache directory will be created automatically")
+            
+            # Clear Streamlit cache
+            st.cache_data.clear()
+            
+            st.balloons()
     
     # Export button will be created after we have data
     export_col = col3  # Save for later
@@ -1029,11 +1049,6 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     
     with col5:
         show_custom_view_manager(watchlist_id)
-    
-    if clear_cache:
-        st.session_state.stock_tr_cache = {}
-        st.success("✅ Cache cleared")
-        st.rerun()
     
     # Get columns to display
     all_views = get_all_views()

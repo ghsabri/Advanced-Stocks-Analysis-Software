@@ -1,24 +1,19 @@
 """
-Shared Data Cache Module
-This module provides a single cached data fetching function that ALL pages use.
-This ensures data is fetched once and shared across TR Indicator, Pattern Detection, etc.
-
-IMPORTANT: Uses @st.cache_resource for GLOBAL cache sharing across pages!
+Cached Data Module - Uses Streamlit's Built-in Caching
+Provides get_shared_stock_data() function for all pages
 """
 
 import streamlit as st
 from tr_enhanced import analyze_stock_complete_tr
 
 
-# Dictionary to store cached data globally
-_global_cache = {}
-
-
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_shared_stock_data(ticker, duration_days, timeframe='daily', api_source='yahoo'):
     """
-    Fetch stock data with TR analysis - SHARED CACHE across all pages
+    Fetch stock data with TR analysis - CACHED using @st.cache_data
     
-    Uses a global dictionary cache that persists across all pages.
+    Uses Streamlit's built-in caching decorator which persists across reruns.
+    The stock data AND SPY (for RS calc) will both be cached via universal_cache.
     
     Args:
         ticker (str): Stock symbol (e.g., 'AAPL', 'TSLA')
@@ -30,38 +25,23 @@ def get_shared_stock_data(ticker, duration_days, timeframe='daily', api_source='
         pd.DataFrame: Complete stock data with TR analysis, RS, Chaikin, etc.
     
     Cache Details:
-        - Cached globally across ALL pages
-        - Same data shared across TR Indicator, Pattern Detection, Seasonality pages
+        - Cached with @st.cache_data (Streamlit's built-in caching)
+        - TTL: 1 hour (3600 seconds)
         - Cache key: ticker + duration_days + timeframe + api_source
+        - Additionally, raw stock data is cached in universal_cache (.pkl files)
     """
     
-    # NORMALIZE parameters to ensure cache key matches!
-    ticker = ticker.upper().strip()
-    timeframe = timeframe.lower().strip()
-    api_source = api_source.lower().strip()
-    duration_days = int(duration_days)
-    
-    # Create normalized cache key
-    cache_key = f"{ticker}_{duration_days}_{timeframe}_{api_source}"
-    
-    # Check if data is in global cache
-    if cache_key in _global_cache:
-        print(f"✅ USING CACHED DATA: {cache_key}")
-        return _global_cache[cache_key]
-    
-    # Data not in cache - fetch it
-    print(f"🔄 FETCHING NEW DATA: {cache_key}")
+    print(f"📊 Analyzing {ticker} ({duration_days} days, {timeframe}, {api_source})")
     
     df = analyze_stock_complete_tr(
         ticker=ticker,
         timeframe=timeframe,
-        duration_days=duration_days
+        duration_days=duration_days,
+        api_source=api_source  # Pass api_source through!
     )
     
     if df is not None and not df.empty:
-        # Store in global cache
-        _global_cache[cache_key] = df
-        print(f"💾 DATA CACHED GLOBALLY: {cache_key} ({len(df)} rows)")
+        print(f"✅ Analysis complete: {ticker} ({len(df)} rows)")
     else:
         print(f"❌ NO DATA: {ticker}")
     
@@ -85,7 +65,7 @@ def get_simple_stock_data(ticker, duration_days, timeframe='daily'):
     
     from stock_data_formatter import get_stock_data_formatted
     
-    print(f"🔄 FETCHING SIMPLE DATA: {ticker} ({duration_days} days)")
+    print(f"📊 Getting simple data for {ticker} ({duration_days} days)")
     
     df = get_stock_data_formatted(
         ticker=ticker,
@@ -99,6 +79,5 @@ def get_simple_stock_data(ticker, duration_days, timeframe='daily'):
 
 def clear_cache():
     """Clear all cached stock data"""
-    global _global_cache
-    _global_cache.clear()
-    print("🗑️ Global cache cleared!")
+    st.cache_data.clear()
+    print("🗑️ Streamlit cache cleared!")

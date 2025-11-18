@@ -31,41 +31,13 @@ def _get_cache_file(cache_key):
     """Get cache file path"""
     return CACHE_DIR / f"{cache_key}.pkl"
 
-def get_stock_data(ticker, start_date, end_date, interval='1d', force_refresh=False):
-    """
-    Get stock data with file-based caching (multiprocessing compatible)
-    
-    Args:
-        ticker: Stock symbol (AAPL, SPY, etc.)
-        start_date: Start date
-        end_date: End date
-        interval: '1d' (daily) or '1wk' (weekly)
-        force_refresh: Force fetch even if cached
-    
-    Returns:
-        DataFrame with OHLCV data, or None if error
-    """
-    ticker = ticker.upper()
-    cache_key = _get_cache_key(ticker, start_date, end_date, interval)
-    cache_file = _get_cache_file(cache_key)
-    
-    # Check cache first (unless force refresh)
-    if not force_refresh and cache_file.exists():
-        try:
-            with open(cache_file, 'rb') as f:
-                df = pickle.load(f)
-            print(f"   📦 Using cached data for {ticker} ({interval})")
-            return df.copy()
-        except:
-            pass  # Cache corrupted, fetch fresh
-    
-    # Fetch from Yahoo Finance
+def _fetch_from_yahoo(ticker, start_date, end_date, interval='1d'):
+    """Fetch data from Yahoo Finance"""
     try:
         import yfinance as yf
         
-        print(f"   🔍 Fetching {ticker} data from Yahoo Finance... ({interval})")
+        print(f"   🔍 Fetching {ticker} from Yahoo Finance... ({interval})")
         
-        # Download data
         df = yf.download(
             ticker,
             start=start_date,
@@ -91,7 +63,111 @@ def get_stock_data(ticker, start_date, end_date, interval='1d', force_refresh=Fa
         
         df['Date'] = pd.to_datetime(df['Date'])
         
-        print(f"   ✅ Fetched & cached {len(df)} periods for {ticker}")
+        return df
+        
+    except Exception as e:
+        print(f"   ❌ Yahoo error for {ticker}: {str(e)[:100]}")
+        return None
+
+def _fetch_from_tiingo(ticker, start_date, end_date):
+    """Fetch data from Tiingo API"""
+    try:
+        import requests
+        import os
+        from dotenv import load_dotenv
+        
+        load_dotenv()
+        api_key = os.getenv('TIINGO_API_KEY')
+        
+        if not api_key:
+            print(f"   ❌ TIINGO_API_KEY not found in environment!")
+            return None
+        
+        print(f"   🔍 Fetching {ticker} from Tiingo API...")
+        
+        url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices"
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Token {api_key}'
+        }
+        
+        params = {
+            'startDate': pd.to_datetime(start_date).strftime('%Y-%m-%d'),
+            'endDate': pd.to_datetime(end_date).strftime('%Y-%m-%d')
+        }
+        
+        response = requests.get(url, headers=headers, params=params, timeout=30)
+        
+        if response.status_code != 200:
+            print(f"   ❌ Tiingo API error: {response.status_code}")
+            return None
+        
+        data = response.json()
+        
+        if not data:
+            print(f"   ⚠️  No data returned for {ticker}")
+            return None
+        
+        # Convert to DataFrame
+        rows = []
+        for day in data:
+            rows.append({
+                'Date': day['date'][:10],
+                'Open': day['open'],
+                'High': day['high'],
+                'Low': day['low'],
+                'Close': day['close'],
+                'Volume': day['volume'],
+                'Adj Close': day['adjClose']
+            })
+        
+        df = pd.DataFrame(rows)
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        return df
+        
+    except Exception as e:
+        print(f"   ❌ Tiingo error for {ticker}: {str(e)[:100]}")
+        return None
+
+def get_stock_data(ticker, start_date, end_date, interval='1d', api_source='yahoo', force_refresh=False):
+    """
+    Get stock data with file-based caching (multiprocessing compatible)
+    
+    Args:
+        ticker: Stock symbol (AAPL, SPY, etc.)
+        start_date: Start date
+        end_date: End date
+        interval: '1d' (daily) or '1wk' (weekly)
+        api_source: 'yahoo' or 'tiingo'
+        force_refresh: Force fetch even if cached
+    
+    Returns:
+        DataFrame with OHLCV data, or None if error
+    """
+    ticker = ticker.upper()
+    cache_key = _get_cache_key(ticker, start_date, end_date, interval)
+    cache_file = _get_cache_file(cache_key)
+    
+    # Check cache first (unless force refresh)
+    if not force_refresh and cache_file.exists():
+        try:
+            with open(cache_file, 'rb') as f:
+                df = pickle.load(f)
+            print(f"   📦 Using cached data for {ticker} ({interval}, {api_source})")
+            return df.copy()
+        except:
+            pass  # Cache corrupted, fetch fresh
+    
+    # Fetch from API based on source
+    if api_source.lower() == 'tiingo':
+        df = _fetch_from_tiingo(ticker, start_date, end_date)
+    else:
+        df = _fetch_from_yahoo(ticker, start_date, end_date, interval)
+    
+    if df is not None and not df.empty:
+        print(f"   ✅ Fetched & cached {len(df)} periods for {ticker} ({api_source})")
         
         # Cache it
         try:
@@ -101,10 +177,8 @@ def get_stock_data(ticker, start_date, end_date, interval='1d', force_refresh=Fa
             pass  # Cache write failed, not critical
         
         return df.copy()
-        
-    except Exception as e:
-        print(f"   ❌ Error fetching {ticker}: {str(e)[:100]}")
-        return None
+    
+    return None
 
 def get_market_data(market_ticker='SPY', start_date=None, end_date=None, interval='1d'):
     """
