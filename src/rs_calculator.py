@@ -1,6 +1,6 @@
 """
 Relative Strength (RS) Calculator
-Compares stock performance vs market (S&P 500) using IBD methodology
+Compares stock performance vs market (S&P 500)
 """
 
 import pandas as pd
