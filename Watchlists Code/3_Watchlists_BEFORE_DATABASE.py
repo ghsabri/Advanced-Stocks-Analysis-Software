@@ -38,24 +38,6 @@ if src_path not in sys.path:
 from stock_lookup import get_stock_info
 from cached_data import get_shared_stock_data
 
-# Import database module
-try:
-    from database import (
-        create_watchlist as db_create_watchlist,
-        get_all_watchlists as db_get_all_watchlists,
-        update_watchlist_name as db_update_watchlist_name,
-        delete_watchlist as db_delete_watchlist,
-        add_stock_to_watchlist as db_add_stock,
-        get_watchlist_stocks as db_get_stocks,
-        remove_stock_from_watchlist as db_remove_stock
-    )
-    DATABASE_ENABLED = True
-    print("✅ Database module loaded successfully")
-except Exception as e:
-    DATABASE_ENABLED = False
-    print(f"⚠️ Database not available: {e}")
-    print("   Watchlists will work in session-only mode")
-
 st.set_page_config(
     page_title="Watchlists - MJ Software",
     page_icon="📋",
@@ -208,48 +190,11 @@ PRESET_VIEWS = {
 # ============================================================================
 
 def initialize_session_state():
-    """Initialize session state for watchlists - WITH DATABASE INTEGRATION"""
-    
-    # First-time initialization flag
-    if 'watchlists_loaded' not in st.session_state:
-        st.session_state.watchlists_loaded = False
-    
+    """Initialize session state for watchlists - FIXED VERSION"""
     if 'watchlists' not in st.session_state:
         st.session_state.watchlists = {}
     
-    # Load from database on first run
-    if DATABASE_ENABLED and not st.session_state.watchlists_loaded:
-        try:
-            print("📂 Loading watchlists from database...")
-            db_watchlists = db_get_all_watchlists()
-            
-            if db_watchlists:
-                # Convert database format to session state format
-                for db_wl in db_watchlists:
-                    wl_id = db_wl['id']
-                    
-                    # Get stocks for this watchlist
-                    stocks = db_get_stocks(wl_id)
-                    
-                    # Add to session state
-                    st.session_state.watchlists[wl_id] = {
-                        'name': db_wl['name'],
-                        'created_at': datetime.fromisoformat(db_wl['created_at'].replace('Z', '+00:00')),
-                        'stocks': stocks,
-                        'db_id': wl_id  # Store database ID
-                    }
-                
-                print(f"✅ Loaded {len(db_watchlists)} watchlists from database")
-            else:
-                print("ℹ️ No watchlists found in database")
-                
-            st.session_state.watchlists_loaded = True
-            
-        except Exception as e:
-            print(f"⚠️ Could not load from database: {e}")
-            st.session_state.watchlists_loaded = True  # Don't keep trying
-    
-    # Calculate next_watchlist_id based on existing watchlists
+    # FIXED: Calculate next_watchlist_id based on existing watchlists
     if 'next_watchlist_id' not in st.session_state:
         if st.session_state.watchlists:
             # Get the maximum existing ID and add 1
@@ -259,10 +204,7 @@ def initialize_session_state():
             st.session_state.next_watchlist_id = 1
     
     if 'active_watchlist' not in st.session_state:
-        if st.session_state.watchlists:
-            st.session_state.active_watchlist = list(st.session_state.watchlists.keys())[0]
-        else:
-            st.session_state.active_watchlist = None
+        st.session_state.active_watchlist = None
     
     if 'stock_tr_cache' not in st.session_state:
         st.session_state.stock_tr_cache = {}
@@ -271,161 +213,68 @@ def initialize_session_state():
     if 'custom_views' not in st.session_state:
         st.session_state.custom_views = {}
     
-    # Load custom views from database (only once)
-    if 'custom_views_loaded' not in st.session_state:
-        st.session_state.custom_views_loaded = False
-    
-    if DATABASE_ENABLED and not st.session_state.custom_views_loaded:
-        try:
-            from database import get_all_custom_views
-            db_custom_views = get_all_custom_views()
-            st.session_state.custom_views.update(db_custom_views)
-            st.session_state.custom_views_loaded = True
-        except Exception as e:
-            print(f"⚠️ Could not load custom views: {e}")
-            st.session_state.custom_views_loaded = True
-    
     # View preference per watchlist
     if 'watchlist_view_prefs' not in st.session_state:
         st.session_state.watchlist_view_prefs = {}
-    
-    # Load view preferences from database for each watchlist
-    if DATABASE_ENABLED and st.session_state.watchlists:
-        try:
-            from database import get_watchlist_view_preference
-            for wl_id in st.session_state.watchlists.keys():
-                if wl_id not in st.session_state.watchlist_view_prefs:
-                    view_pref = get_watchlist_view_preference(wl_id)
-                    if view_pref:
-                        st.session_state.watchlist_view_prefs[wl_id] = view_pref
-                    else:
-                        # Default to Performance view
-                        st.session_state.watchlist_view_prefs[wl_id] = 'Performance'
-        except Exception as e:
-            print(f"⚠️ Could not load view preferences: {e}")
     
     # Sorting state per watchlist
     if 'watchlist_sort' not in st.session_state:
         st.session_state.watchlist_sort = {}
 
-
 # ============================================================================
 # WATCHLIST MANAGEMENT FUNCTIONS
 # ============================================================================
 
-def create_watchlist(name):
-    """Create a new watchlist - WITH DATABASE INTEGRATION"""
-    
-    # Create in database first
-    if DATABASE_ENABLED:
-        try:
-            db_watchlist = db_create_watchlist(name)
-            if db_watchlist:
-                watchlist_id = db_watchlist['id']
-                print(f"✅ Created watchlist in database (ID: {watchlist_id})")
-            else:
-                print("⚠️ Database creation failed, using session only")
-                watchlist_id = st.session_state.next_watchlist_id if st.session_state.watchlists else 1
-                st.session_state.next_watchlist_id = watchlist_id + 1
-        except Exception as e:
-            print(f"⚠️ Database error: {e}, using session only")
-            watchlist_id = st.session_state.next_watchlist_id if st.session_state.watchlists else 1
-            st.session_state.next_watchlist_id = watchlist_id + 1
+def create_watchlist(name, data_source='yahoo'):
+    """Create a new watchlist - FIXED"""
+    # FIXED: Calculate next ID based on existing watchlists to prevent duplicates
+    if st.session_state.watchlists:
+        watchlist_id = max(st.session_state.watchlists.keys()) + 1
     else:
-        # No database, calculate ID based on existing watchlists
-        if st.session_state.watchlists:
-            watchlist_id = max(st.session_state.watchlists.keys()) + 1
-        else:
-            watchlist_id = 1
-        st.session_state.next_watchlist_id = watchlist_id + 1
+        watchlist_id = 1
     
-    # Add to session state
     st.session_state.watchlists[watchlist_id] = {
         'name': name,
         'created_at': datetime.now(),
         'stocks': [],
-        'db_id': watchlist_id
+        'data_source': data_source
     }
     
+    # Update next_watchlist_id
+    st.session_state.next_watchlist_id = watchlist_id + 1
     st.session_state.active_watchlist = watchlist_id
-    
-    # Set default view to Performance and save to database
-    st.session_state.watchlist_view_prefs[watchlist_id] = 'Performance'
-    
-    if DATABASE_ENABLED:
-        try:
-            from database import save_watchlist_view_preference
-            save_watchlist_view_preference(watchlist_id, 'Performance')
-        except Exception as e:
-            print(f"⚠️ Could not save view preference: {e}")
+    st.session_state.watchlist_view_prefs[watchlist_id] = 'Standard'
     
     return watchlist_id
 
 def delete_watchlist(watchlist_id):
-    """Delete a watchlist - WITH DATABASE INTEGRATION"""
+    """Delete a watchlist"""
     if watchlist_id in st.session_state.watchlists:
-        # Delete from database
-        if DATABASE_ENABLED:
-            try:
-                db_delete_watchlist(watchlist_id)
-            except Exception as e:
-                print(f"⚠️ Database deletion failed: {e}")
-        
-        # Delete from session state
         del st.session_state.watchlists[watchlist_id]
         if watchlist_id in st.session_state.watchlist_view_prefs:
             del st.session_state.watchlist_view_prefs[watchlist_id]
-        
-        # Update active watchlist
         if st.session_state.active_watchlist == watchlist_id:
-            if st.session_state.watchlists:
-                st.session_state.active_watchlist = list(st.session_state.watchlists.keys())[0]
-            else:
-                st.session_state.active_watchlist = None
+            st.session_state.active_watchlist = None
 
 def rename_watchlist(watchlist_id, new_name):
-    """Rename a watchlist - WITH DATABASE INTEGRATION"""
+    """Rename a watchlist"""
     if watchlist_id in st.session_state.watchlists:
-        # Update in database
-        if DATABASE_ENABLED:
-            try:
-                db_update_watchlist_name(watchlist_id, new_name)
-            except Exception as e:
-                print(f"⚠️ Database update failed: {e}")
-        
-        # Update session state
         st.session_state.watchlists[watchlist_id]['name'] = new_name
 
 def add_stock_to_watchlist(watchlist_id, symbol):
-    """Add a stock to a watchlist - WITH DATABASE INTEGRATION"""
+    """Add a stock to a watchlist"""
     if watchlist_id in st.session_state.watchlists:
         stocks = st.session_state.watchlists[watchlist_id]['stocks']
         if symbol not in stocks:
-            # Add to database
-            if DATABASE_ENABLED:
-                try:
-                    db_add_stock(watchlist_id, symbol)
-                except Exception as e:
-                    print(f"⚠️ Database add failed: {e}")
-            
-            # Add to session state
             stocks.append(symbol)
             return True
     return False
 
 def remove_stock_from_watchlist(watchlist_id, symbol):
-    """Remove a stock from a watchlist - WITH DATABASE INTEGRATION"""
+    """Remove a stock from a watchlist"""
     if watchlist_id in st.session_state.watchlists:
         stocks = st.session_state.watchlists[watchlist_id]['stocks']
         if symbol in stocks:
-            # Remove from database
-            if DATABASE_ENABLED:
-                try:
-                    db_remove_stock(watchlist_id, symbol)
-                except Exception as e:
-                    print(f"⚠️ Database removal failed: {e}")
-            
-            # Remove from session state
             stocks.remove(symbol)
             return True
     return False
@@ -447,29 +296,11 @@ def get_watchlist_summary(watchlist_id):
 # ============================================================================
 
 def save_custom_view(view_name, fields):
-    """Save a custom view - WITH DATABASE INTEGRATION"""
-    # Save to database
-    if DATABASE_ENABLED:
-        try:
-            from database import save_custom_view as db_save_custom_view
-            db_save_custom_view(view_name, fields)
-        except Exception as e:
-            print(f"⚠️ Database save failed: {e}")
-    
-    # Save to session state
+    """Save a custom view"""
     st.session_state.custom_views[view_name] = fields
 
 def delete_custom_view(view_name):
-    """Delete a custom view - WITH DATABASE INTEGRATION"""
-    # Delete from database
-    if DATABASE_ENABLED:
-        try:
-            from database import delete_custom_view as db_delete_custom_view
-            db_delete_custom_view(view_name)
-        except Exception as e:
-            print(f"⚠️ Database deletion failed: {e}")
-    
-    # Delete from session state
+    """Delete a custom view"""
     if view_name in st.session_state.custom_views:
         del st.session_state.custom_views[view_name]
 
@@ -544,17 +375,17 @@ def format_tr_status_html(tr_status):
 
 def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
     """
-    OPTIMIZED Enhanced analysis - Only calculates needed fields
+    Enhanced analysis with ALL 32 fields - FIXED VERSION
     
-    PERFORMANCE OPTIMIZATION:
-    - Detects which fields are actually needed based on current view
-    - Skips expensive calculations for fields not being displayed
-    - Can speed up analysis by 5-10x for simple views
+    FIXES:
+    - Removed invalid include_tr parameter
+    - TR is always calculated by get_shared_stock_data
+    - Added comprehensive error handling for API failures
     
     Args:
         symbol: Stock ticker symbol
         data_source: 'yahoo' or 'tiingo' (default: 'yahoo')
-        needed_fields: List of field IDs that are needed (if None, calculates all)
+        needed_fields: List of field IDs that are actually needed (for future optimization)
     """
     # Check cache first
     cache_key = f"{symbol}_{data_source}"
@@ -563,290 +394,227 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
         if cached_time and (datetime.now() - cached_time).total_seconds() < 300:  # 5 minute cache
             return st.session_state.stock_tr_cache[cache_key]
     
-    # ============= SMART FIELD DETECTION =============
-    # Determine what needs to be calculated
-    if needed_fields is None:
-        # If not specified, calculate everything (backward compatibility)
-        needs_tr = True
-        needs_technical = True
-        needs_emas = True
-        needs_52w = True
-        needs_fundamentals = True
-        needs_performance = True
-        needs_tr_levels = True
-    else:
-        # Only calculate what's needed
-        needs_tr = any(f in needed_fields for f in ['tr_status', 'tr_value'])
-        needs_technical = any(f in needed_fields for f in ['rsi', 'macd'])
-        needs_emas = any(f in needed_fields for f in ['ema_6', 'ema_10', 'ema_13', 'ema_20', 'ema_30', 'ema_50', 'ema_200'])
-        needs_52w = any(f in needed_fields for f in ['high_52w', 'low_52w'])
-        needs_fundamentals = any(f in needed_fields for f in ['beta', 'pe_ratio', 'market_cap'])
-        needs_performance = any(f in needed_fields for f in ['perf_1m', 'perf_3m', 'perf_6m', 'perf_ytd', 'perf_1y', 'perf_3y', 'perf_5y'])
-        needs_tr_levels = any(f in needed_fields for f in ['buy_point', 'stop_loss', 'risk_pct'])
-    
     try:
-        # PERFORMANCE OPTIMIZATION: Use simple data fetch if TR is not needed
-        # This skips expensive TR calculations and speeds up analysis by 3-5x
-        if needs_tr or needs_tr_levels:
-            # TR is needed - use full analysis
-            df = get_shared_stock_data(
-                ticker=symbol,
-                duration_days=1825,
-                timeframe='daily',
-                api_source=data_source
-            )
-        else:
-            # TR not needed - use simple fetch (much faster!)
-            from cached_data import get_simple_stock_data
-            df = get_simple_stock_data(
-                ticker=symbol,
-                duration_days=1825,
-                timeframe='daily'
-            )
+        # FIXED: Removed include_tr parameter - TR is always calculated
+        df = get_shared_stock_data(
+            ticker=symbol,
+            duration_days=1825,  # 5 years
+            timeframe='daily',
+            api_source=data_source
+        )
         
         if df is None or df.empty:
+            # API failed - don't cache this failure
             return None
         
         latest = df.iloc[-1]
         
-        # ============= ALWAYS CALCULATE BASIC FIELDS =============
-        # These are fast and always needed
-        current_price = latest['Close']
-        volume = latest.get('Volume', None)
+        # ============= TR VALUE & STATUS =============
+        tr_value = None
+        possible_tr_names = ['TR', 'TR Indicator', 'TR_Value', 'tr', 'TR_Indicator', 'TR Value']
         
-        # Price change
+        for col_name in possible_tr_names:
+            if col_name in df.columns:
+                tr_value = latest.get(col_name, None)
+                if tr_value is not None and not pd.isna(tr_value):
+                    break
+        
+        # Calculate TR from EMAs if not found
+        if tr_value is None or pd.isna(tr_value):
+            close = latest['Close']
+            ema_13 = df['Close'].ewm(span=13, adjust=False).mean().iloc[-1] if len(df) >= 13 else None
+            ema_30 = df['Close'].ewm(span=30, adjust=False).mean().iloc[-1] if len(df) >= 30 else None
+            
+            if ema_13 and ema_30:
+                if close > ema_13 and ema_13 > ema_30:
+                    spread = ((close - ema_30) / ema_30) * 100
+                    tr_value = 2.0 if spread > 5 else 1.5
+                elif close > ema_13:
+                    tr_value = 1.0
+                elif close < ema_13 and ema_13 < ema_30:
+                    spread = ((ema_30 - close) / ema_30) * 100
+                    tr_value = -2.0 if spread > 5 else -1.5
+                elif close < ema_13:
+                    tr_value = -1.0
+                else:
+                    tr_value = 0.0
+        
+        # TR Status
+        if tr_value is None or pd.isna(tr_value):
+            tr_status = "N/A"
+        else:
+            if tr_value >= 2:
+                tr_status = "Strong Buy"
+            elif tr_value >= 1:
+                tr_status = "Buy"
+            elif tr_value >= -1:
+                tr_status = "Neutral"
+            elif tr_value >= -2:
+                tr_status = "Sell"
+            else:
+                tr_status = "Strong Sell"
+        
+        # ============= PRICE CHANGE =============
         if len(df) > 1:
             prev_close = df.iloc[-2]['Close']
-            price_change = current_price - prev_close
+            price_change = latest['Close'] - prev_close
             price_change_pct = (price_change / prev_close) * 100
         else:
             price_change = 0
             price_change_pct = 0
         
-        # ============= CONDITIONAL CALCULATIONS =============
+        # ============= TECHNICAL INDICATORS =============
+        rsi = calculate_rsi(df)
+        macd = calculate_macd(df)
         
-        # TR INDICATOR (if needed)
-        if needs_tr:
-            tr_value = None
-            possible_tr_names = ['TR', 'TR Indicator', 'TR_Value', 'tr', 'TR_Indicator', 'TR Value']
+        # ============= MOVING AVERAGES =============
+        ema_6 = df['Close'].ewm(span=6, adjust=False).mean().iloc[-1] if len(df) >= 6 else None
+        ema_10 = df['Close'].ewm(span=10, adjust=False).mean().iloc[-1] if len(df) >= 10 else None
+        ema_13 = df['Close'].ewm(span=13, adjust=False).mean().iloc[-1] if len(df) >= 13 else None
+        ema_20 = df['Close'].ewm(span=20, adjust=False).mean().iloc[-1] if len(df) >= 20 else None
+        ema_30 = df['Close'].ewm(span=30, adjust=False).mean().iloc[-1] if len(df) >= 30 else None
+        ema_50 = df['Close'].ewm(span=50, adjust=False).mean().iloc[-1] if len(df) >= 50 else None
+        ema_200 = df['Close'].ewm(span=200, adjust=False).mean().iloc[-1] if len(df) >= 200 else None
+        
+        # ============= 52 WEEK HIGH/LOW =============
+        high_52w = df['High'].tail(252).max() if len(df) >= 252 else df['High'].max()
+        low_52w = df['Low'].tail(252).min() if len(df) >= 252 else df['Low'].min()
+        
+        # ============= FUNDAMENTALS =============
+        fundamentals = get_fundamentals(symbol)
+        
+        # ============= PERFORMANCE =============
+        current_price = latest['Close']
+        
+        # 1 Month Performance
+        if len(df) >= 21:
+            price_1m_ago = df.iloc[-21]['Close']
+            perf_1m = ((current_price - price_1m_ago) / price_1m_ago) * 100
+        else:
+            perf_1m = None
+        
+        # 3 Month Performance
+        if len(df) >= 63:
+            price_3m_ago = df.iloc[-63]['Close']
+            perf_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
+        else:
+            perf_3m = None
+        
+        # 6 Month Performance
+        if len(df) >= 126:
+            price_6m_ago = df.iloc[-126]['Close']
+            perf_6m = ((current_price - price_6m_ago) / price_6m_ago) * 100
+        else:
+            perf_6m = None
+        
+        # YTD Performance - FIXED
+        perf_ytd = None
+        try:
+            year_start = datetime(datetime.now().year, 1, 1)
             
-            for col_name in possible_tr_names:
-                if col_name in df.columns:
-                    tr_value = latest.get(col_name, None)
-                    if tr_value is not None and not pd.isna(tr_value):
-                        break
-            
-            # Calculate TR from EMAs if not found
-            if tr_value is None or pd.isna(tr_value):
-                ema_13 = df['Close'].ewm(span=13, adjust=False).mean().iloc[-1] if len(df) >= 13 else None
-                ema_30 = df['Close'].ewm(span=30, adjust=False).mean().iloc[-1] if len(df) >= 30 else None
-                
-                if ema_13 and ema_30:
-                    if current_price > ema_13 and ema_13 > ema_30:
-                        spread = ((current_price - ema_30) / ema_30) * 100
-                        tr_value = 2.0 if spread > 5 else 1.5
-                    elif current_price > ema_13:
-                        tr_value = 1.0
-                    elif current_price < ema_13 and ema_13 < ema_30:
-                        spread = ((ema_30 - current_price) / ema_30) * 100
-                        tr_value = -2.0 if spread > 5 else -1.5
-                    elif current_price < ema_13:
-                        tr_value = -1.0
-                    else:
-                        tr_value = 0.0
-            
-            # TR Status
-            if tr_value is None or pd.isna(tr_value):
-                tr_status = "N/A"
-            else:
-                if tr_value >= 2:
-                    tr_status = "Strong Buy"
-                elif tr_value >= 1:
-                    tr_status = "Buy"
-                elif tr_value >= -1:
-                    tr_status = "Neutral"
-                elif tr_value >= -2:
-                    tr_status = "Sell"
+            # Convert df.index to datetime if needed
+            if not isinstance(df.index, pd.DatetimeIndex):
+                if 'Date' in df.columns:
+                    df_temp = df.copy()
+                    df_temp['Date'] = pd.to_datetime(df_temp['Date'])
+                    df_temp = df_temp.set_index('Date')
                 else:
-                    tr_status = "Strong Sell"
-        else:
-            tr_value = None
-            tr_status = None
-        
-        # TECHNICAL INDICATORS (if needed)
-        if needs_technical:
-            rsi = calculate_rsi(df)
-            macd = calculate_macd(df)
-        else:
-            rsi = None
-            macd = None
-        
-        # MOVING AVERAGES (if needed)
-        if needs_emas:
-            ema_6 = df['Close'].ewm(span=6, adjust=False).mean().iloc[-1] if len(df) >= 6 else None
-            ema_10 = df['Close'].ewm(span=10, adjust=False).mean().iloc[-1] if len(df) >= 10 else None
-            ema_13 = df['Close'].ewm(span=13, adjust=False).mean().iloc[-1] if len(df) >= 13 else None
-            ema_20 = df['Close'].ewm(span=20, adjust=False).mean().iloc[-1] if len(df) >= 20 else None
-            ema_30 = df['Close'].ewm(span=30, adjust=False).mean().iloc[-1] if len(df) >= 30 else None
-            ema_50 = df['Close'].ewm(span=50, adjust=False).mean().iloc[-1] if len(df) >= 50 else None
-            ema_200 = df['Close'].ewm(span=200, adjust=False).mean().iloc[-1] if len(df) >= 200 else None
-        else:
-            ema_6 = ema_10 = ema_13 = ema_20 = ema_30 = ema_50 = ema_200 = None
-        
-        # 52 WEEK HIGH/LOW (if needed)
-        if needs_52w:
-            high_52w = df['High'].tail(252).max() if len(df) >= 252 else df['High'].max()
-            low_52w = df['Low'].tail(252).min() if len(df) >= 252 else df['Low'].min()
-        else:
-            high_52w = None
-            low_52w = None
-        
-        # FUNDAMENTALS (if needed)
-        if needs_fundamentals:
-            fundamentals = get_fundamentals(symbol)
-            beta = fundamentals['beta']
-            pe_ratio = fundamentals['pe_ratio']
-            market_cap = fundamentals['market_cap']
-        else:
-            beta = None
-            pe_ratio = None
-            market_cap = None
-        
-        # PERFORMANCE METRICS (if needed)
-        if needs_performance:
-            # 1 Month Performance
-            if len(df) >= 21:
-                price_1m_ago = df.iloc[-21]['Close']
-                perf_1m = ((current_price - price_1m_ago) / price_1m_ago) * 100
+                    df_temp = df.copy()
+                    df_temp.index = pd.to_datetime(df_temp.index)
             else:
-                perf_1m = None
+                df_temp = df
             
-            # 3 Month Performance
-            if len(df) >= 63:
-                price_3m_ago = df.iloc[-63]['Close']
-                perf_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
-            else:
-                perf_3m = None
+            # Handle timezone
+            if hasattr(df_temp.index, 'tz') and df_temp.index.tz is not None:
+                import pytz
+                year_start = year_start.replace(tzinfo=pytz.UTC)
             
-            # 6 Month Performance
-            if len(df) >= 126:
-                price_6m_ago = df.iloc[-126]['Close']
-                perf_6m = ((current_price - price_6m_ago) / price_6m_ago) * 100
-            else:
-                perf_6m = None
-            
-            # YTD Performance
-            perf_ytd = None
+            df_ytd = df_temp[df_temp.index >= year_start]
+            if len(df_ytd) > 0:
+                price_ytd_start = df_ytd.iloc[0]['Close']
+                perf_ytd = ((current_price - price_ytd_start) / price_ytd_start) * 100
+        except Exception as e:
+            # Fallback: use trading days estimate
+            days_this_year = (datetime.now() - datetime(datetime.now().year, 1, 1)).days
+            trading_days_ytd = int(days_this_year * 0.69)
+            if len(df) >= trading_days_ytd and trading_days_ytd > 0:
+                price_ytd_start = df.iloc[-trading_days_ytd]['Close']
+                perf_ytd = ((current_price - price_ytd_start) / price_ytd_start) * 100
+        
+        # 1 Year Performance
+        if len(df) >= 252:
+            price_1y_ago = df.iloc[-252]['Close']
+            perf_1y = ((current_price - price_1y_ago) / price_1y_ago) * 100
+        else:
+            perf_1y = None
+        
+        # 3 Year Performance
+        if len(df) >= 756:
+            price_3y_ago = df.iloc[-756]['Close']
+            perf_3y = ((current_price - price_3y_ago) / price_3y_ago) * 100
+        else:
+            perf_3y = None
+        
+        # 5 Year Performance
+        perf_5y = None
+        if len(df) >= 1260:
             try:
-                year_start = datetime(datetime.now().year, 1, 1)
-                
-                if not isinstance(df.index, pd.DatetimeIndex):
-                    if 'Date' in df.columns:
-                        df_temp = df.copy()
-                        df_temp['Date'] = pd.to_datetime(df_temp['Date'])
-                        df_temp = df_temp.set_index('Date')
-                    else:
-                        df_temp = df.copy()
-                        df_temp.index = pd.to_datetime(df_temp.index)
-                else:
-                    df_temp = df
-                
-                if hasattr(df_temp.index, 'tz') and df_temp.index.tz is not None:
-                    import pytz
-                    year_start = year_start.replace(tzinfo=pytz.UTC)
-                
-                df_ytd = df_temp[df_temp.index >= year_start]
-                if len(df_ytd) > 0:
-                    price_ytd_start = df_ytd.iloc[0]['Close']
-                    perf_ytd = ((current_price - price_ytd_start) / price_ytd_start) * 100
-            except Exception as e:
-                days_this_year = (datetime.now() - datetime(datetime.now().year, 1, 1)).days
-                trading_days_ytd = int(days_this_year * 0.69)
-                if len(df) >= trading_days_ytd and trading_days_ytd > 0:
-                    price_ytd_start = df.iloc[-trading_days_ytd]['Close']
-                    perf_ytd = ((current_price - price_ytd_start) / price_ytd_start) * 100
-            
-            # 1 Year Performance
-            if len(df) >= 252:
-                price_1y_ago = df.iloc[-252]['Close']
-                perf_1y = ((current_price - price_1y_ago) / price_1y_ago) * 100
-            else:
-                perf_1y = None
-            
-            # 3 Year Performance
-            if len(df) >= 756:
-                price_3y_ago = df.iloc[-756]['Close']
-                perf_3y = ((current_price - price_3y_ago) / price_3y_ago) * 100
-            else:
-                perf_3y = None
-            
-            # 5 Year Performance
-            perf_5y = None
-            if len(df) >= 1260:
-                try:
-                    price_5y_ago = df.iloc[-1260]['Close']
-                    perf_5y = ((current_price - price_5y_ago) / price_5y_ago) * 100
-                except:
-                    perf_5y = None
-            elif len(df) >= 1000:
-                try:
-                    price_earliest = df.iloc[0]['Close']
-                    perf_5y = ((current_price - price_earliest) / price_earliest) * 100
-                except:
-                    perf_5y = None
-        else:
-            perf_1m = perf_3m = perf_6m = perf_ytd = perf_1y = perf_3y = perf_5y = None
+                price_5y_ago = df.iloc[-1260]['Close']
+                perf_5y = ((current_price - price_5y_ago) / price_5y_ago) * 100
+            except:
+                perf_5y = None
+        elif len(df) >= 1000:
+            try:
+                price_earliest = df.iloc[0]['Close']
+                perf_5y = ((current_price - price_earliest) / price_earliest) * 100
+            except:
+                perf_5y = None
         
-        # TR LEVELS (if needed)
-        if needs_tr_levels:
-            buy_point = None
-            stop_loss = None
-            buy_names = ['Buy Point', 'buy_point', 'BuyPoint', 'Entry', 'Buy_Point']
-            stop_names = ['Stop Loss', 'stop_loss', 'StopLoss', 'Stop', 'Stop_Loss']
-            
-            for col_name in buy_names:
-                if col_name in df.columns:
-                    buy_point = latest.get(col_name, None)
-                    if buy_point is not None and not pd.isna(buy_point):
-                        break
-            
-            for col_name in stop_names:
-                if col_name in df.columns:
-                    stop_loss = latest.get(col_name, None)
-                    if stop_loss is not None and not pd.isna(stop_loss):
-                        break
-            
-            risk_pct = None
-            if buy_point and stop_loss and buy_point > 0:
-                risk_pct = ((buy_point - stop_loss) / buy_point) * 100
-        else:
-            buy_point = None
-            stop_loss = None
-            risk_pct = None
+        # ============= TR LEVELS =============
+        buy_point = None
+        stop_loss = None
+        buy_names = ['Buy Point', 'buy_point', 'BuyPoint', 'Entry', 'Buy_Point']
+        stop_names = ['Stop Loss', 'stop_loss', 'StopLoss', 'Stop', 'Stop_Loss']
+        
+        for col_name in buy_names:
+            if col_name in df.columns:
+                buy_point = latest.get(col_name, None)
+                if buy_point is not None and not pd.isna(buy_point):
+                    break
+        
+        for col_name in stop_names:
+            if col_name in df.columns:
+                stop_loss = latest.get(col_name, None)
+                if stop_loss is not None and not pd.isna(stop_loss):
+                    break
+        
+        risk_pct = None
+        if buy_point and stop_loss and buy_point > 0:
+            risk_pct = ((buy_point - stop_loss) / buy_point) * 100
         
         # ============= BUILD COMPLETE RESULT =============
         result = {
-            # Basic (always calculated)
+            # Basic
             'symbol': symbol,
-            'current_price': current_price,
+            'current_price': latest['Close'],
             'price_change': price_change,
             'price_change_pct': price_change_pct,
-            'volume': volume,
+            'volume': latest.get('Volume', None),
             
-            # TR Indicators (conditional)
+            # TR Indicators
             'tr_status': tr_status,
             'tr_value': tr_value,
             
-            # Technical (conditional)
+            # Technical
             'rsi': rsi,
             'macd': macd,
             
-            # TR Levels (conditional)
+            # TR Levels
             'buy_point': buy_point,
             'stop_loss': stop_loss,
             'risk_pct': risk_pct,
             
-            # Moving Averages (conditional)
+            # Moving Averages
             'ema_6': ema_6,
             'ema_10': ema_10,
             'ema_13': ema_13,
@@ -855,16 +623,16 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
             'ema_50': ema_50,
             'ema_200': ema_200,
             
-            # 52 Week Stats (conditional)
+            # 52 Week Stats
             'high_52w': high_52w,
             'low_52w': low_52w,
             
-            # Fundamentals (conditional)
-            'beta': beta,
-            'pe_ratio': pe_ratio,
-            'market_cap': market_cap,
+            # Fundamentals
+            'beta': fundamentals['beta'],
+            'pe_ratio': fundamentals['pe_ratio'],
+            'market_cap': fundamentals['market_cap'],
             
-            # Performance (conditional)
+            # Performance
             'perf_1m': perf_1m,
             'perf_3m': perf_3m,
             'perf_6m': perf_6m,
@@ -875,7 +643,7 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
             
             # Metadata
             'timestamp': datetime.now(),
-            'price': current_price
+            'price': latest['Close']
         }
         
         # Cache the result
@@ -1182,15 +950,6 @@ def show_custom_view_manager(watchlist_id):
                         selected_fields.insert(0, 'symbol')
                     save_custom_view(view_name, selected_fields)
                     st.session_state.watchlist_view_prefs[watchlist_id] = view_name
-                    
-                    # Save to database
-                    if DATABASE_ENABLED:
-                        try:
-                            from database import save_watchlist_view_preference
-                            save_watchlist_view_preference(watchlist_id, view_name)
-                        except Exception as e:
-                            print(f"⚠️ Could not save view preference: {e}")
-                    
                     st.success(f"✅ Saved view: {view_name}")
                     st.rerun()
                 elif not view_name:
@@ -1245,25 +1004,6 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         
         if selected_view != current_view:
             st.session_state.watchlist_view_prefs[watchlist_id] = selected_view
-            
-            # CLEAR CACHE when view changes - forces re-analysis with new columns
-            # Clear cached data for all stocks in this watchlist
-            watchlist = st.session_state.watchlists[watchlist_id]
-            stocks = watchlist['stocks']
-            data_source = watchlist.get('data_source', 'yahoo')
-            for symbol in stocks:
-                cache_key = f"{symbol}_{data_source}"
-                if cache_key in st.session_state.stock_tr_cache:
-                    del st.session_state.stock_tr_cache[cache_key]
-            
-            # Save to database
-            if DATABASE_ENABLED:
-                try:
-                    from database import save_watchlist_view_preference
-                    save_watchlist_view_preference(watchlist_id, selected_view)
-                except Exception as e:
-                    print(f"⚠️ Could not save view preference: {e}")
-            
             st.rerun()
     
     with col2:
@@ -1429,7 +1169,7 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         with data_cols[0]:
             symbol = stock.get('symbol', '')
             is_checked = symbol in st.session_state[bulk_delete_key]
-            if st.checkbox("Select", value=is_checked, key=f"check_{watchlist_id}_{idx}_{symbol}", label_visibility="collapsed"):
+            if st.checkbox("", value=is_checked, key=f"check_{watchlist_id}_{idx}_{symbol}", label_visibility="collapsed"):
                 st.session_state[bulk_delete_key].add(symbol)
             else:
                 st.session_state[bulk_delete_key].discard(symbol)

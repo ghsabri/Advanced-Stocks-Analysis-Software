@@ -567,6 +567,7 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
     # Determine what needs to be calculated
     if needed_fields is None:
         # If not specified, calculate everything (backward compatibility)
+        print(f"⚠️ No needed_fields specified for {symbol} - calculating everything")
         needs_tr = True
         needs_technical = True
         needs_emas = True
@@ -576,6 +577,7 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
         needs_tr_levels = True
     else:
         # Only calculate what's needed
+        print(f"⚡ Smart optimization for {symbol}: needed_fields = {needed_fields}")
         needs_tr = any(f in needed_fields for f in ['tr_status', 'tr_value'])
         needs_technical = any(f in needed_fields for f in ['rsi', 'macd'])
         needs_emas = any(f in needed_fields for f in ['ema_6', 'ema_10', 'ema_13', 'ema_20', 'ema_30', 'ema_50', 'ema_200'])
@@ -583,26 +585,17 @@ def analyze_stock_enhanced(symbol, data_source='yahoo', needed_fields=None):
         needs_fundamentals = any(f in needed_fields for f in ['beta', 'pe_ratio', 'market_cap'])
         needs_performance = any(f in needed_fields for f in ['perf_1m', 'perf_3m', 'perf_6m', 'perf_ytd', 'perf_1y', 'perf_3y', 'perf_5y'])
         needs_tr_levels = any(f in needed_fields for f in ['buy_point', 'stop_loss', 'risk_pct'])
+        
+        print(f"  📊 Calculation flags: TR={needs_tr}, Technical={needs_technical}, EMAs={needs_emas}, Performance={needs_performance}, Fundamentals={needs_fundamentals}")
     
     try:
-        # PERFORMANCE OPTIMIZATION: Use simple data fetch if TR is not needed
-        # This skips expensive TR calculations and speeds up analysis by 3-5x
-        if needs_tr or needs_tr_levels:
-            # TR is needed - use full analysis
-            df = get_shared_stock_data(
-                ticker=symbol,
-                duration_days=1825,
-                timeframe='daily',
-                api_source=data_source
-            )
-        else:
-            # TR not needed - use simple fetch (much faster!)
-            from cached_data import get_simple_stock_data
-            df = get_simple_stock_data(
-                ticker=symbol,
-                duration_days=1825,
-                timeframe='daily'
-            )
+        # Get stock data
+        df = get_shared_stock_data(
+            ticker=symbol,
+            duration_days=1825,  # 5 years
+            timeframe='daily',
+            api_source=data_source
+        )
         
         if df is None or df.empty:
             return None
@@ -1246,16 +1239,6 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         if selected_view != current_view:
             st.session_state.watchlist_view_prefs[watchlist_id] = selected_view
             
-            # CLEAR CACHE when view changes - forces re-analysis with new columns
-            # Clear cached data for all stocks in this watchlist
-            watchlist = st.session_state.watchlists[watchlist_id]
-            stocks = watchlist['stocks']
-            data_source = watchlist.get('data_source', 'yahoo')
-            for symbol in stocks:
-                cache_key = f"{symbol}_{data_source}"
-                if cache_key in st.session_state.stock_tr_cache:
-                    del st.session_state.stock_tr_cache[cache_key]
-            
             # Save to database
             if DATABASE_ENABLED:
                 try:
@@ -1429,7 +1412,7 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         with data_cols[0]:
             symbol = stock.get('symbol', '')
             is_checked = symbol in st.session_state[bulk_delete_key]
-            if st.checkbox("Select", value=is_checked, key=f"check_{watchlist_id}_{idx}_{symbol}", label_visibility="collapsed"):
+            if st.checkbox("", value=is_checked, key=f"check_{watchlist_id}_{idx}_{symbol}", label_visibility="collapsed"):
                 st.session_state[bulk_delete_key].add(symbol)
             else:
                 st.session_state[bulk_delete_key].discard(symbol)
