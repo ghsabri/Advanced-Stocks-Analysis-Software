@@ -219,31 +219,39 @@ if analyze_button and symbol:
                 status = result['latest_tr_status']
                 
                 # Check if enhanced status is available
+                has_enhanced = False
                 if 'TR_Status_Enhanced' in result.get('full_data', pd.DataFrame()).columns:
                     enhanced_status = result['full_data'].iloc[-1]['TR_Status_Enhanced']
                     display_status = enhanced_status
+                    has_enhanced = True
                 else:
                     display_status = status
                 
                 # Color-code the status
                 if "Strong Buy" in display_status:
                     st.success(f"🟢 {display_status}")
-                    st.caption("Stage 3 Uptrend")
+                    if not has_enhanced:  # Only show stage if NOT using enhanced status
+                        st.caption("Stage 3 Uptrend")
                 elif "Buy" in display_status and "Strong" not in display_status:
                     st.success(f"🟢 {display_status}")
-                    st.caption("Stage 2 Uptrend")
+                    if not has_enhanced:
+                        st.caption("Stage 2 Uptrend")
                 elif "Neutral Buy" in display_status:
                     st.warning(f"🟡 {display_status}")
-                    st.caption("Stage 1 Uptrend")
+                    if not has_enhanced:
+                        st.caption("Stage 1 Uptrend")
                 elif "Neutral Sell" in display_status:
                     st.warning(f"🟡 {display_status}")
-                    st.caption("Stage 1 Downtrend")
+                    if not has_enhanced:
+                        st.caption("Stage 1 Downtrend")
                 elif "Sell" in display_status and "Strong" not in display_status:
                     st.error(f"🔴 {display_status}")
-                    st.caption("Stage 2 Downtrend")
+                    if not has_enhanced:
+                        st.caption("Stage 2 Downtrend")
                 elif "Strong Sell" in display_status:
                     st.error(f"🔴 {display_status}")
-                    st.caption("Stage 3 Downtrend")
+                    if not has_enhanced:
+                        st.caption("Stage 3 Downtrend")
                 else:
                     st.info(f"⚪ {display_status}")
             

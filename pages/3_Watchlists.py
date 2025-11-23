@@ -65,77 +65,159 @@ st.set_page_config(
 # CSS for styling
 st.markdown("""
 <style>
+    /* AGGRESSIVE COMPACT STYLING */
+    
+    /* Compact buttons - aligned vertically with text */
     .stButton > button {
-        height: 38px !important;
-        padding: 6px 16px !important;
-        font-size: 14px !important;
+        height: 28px !important;
+        padding: 5px 8px !important;
+        font-size: 11px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+        vertical-align: middle !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     
     .stDownloadButton > button {
-        height: 38px !important;
-        padding: 6px 16px !important;
-        font-size: 14px !important;
+        height: 28px !important;
+        padding: 5px 8px !important;
+        font-size: 11px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        min-width: 120px !important;
+        min-width: 90px !important;
     }
     
+    /* Checkbox alignment */
+    .stCheckbox {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Drastically reduce ALL vertical spacing */
+    [data-testid="column"] {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* Remove spacing around text - and center align */
+    .stMarkdown {
+        margin-bottom: 0px !important;
+        padding-bottom: 0px !important;
+        display: flex !important;
+        align-items: center !important;
+        min-height: 28px !important;
+    }
+    
+    .stMarkdown p {
+        margin: 0px !important;
+        padding: 0px !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Tighter element containers */
+    .element-container {
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    
+    /* Reduce gap between rows */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0px !important;
+    }
+    
+    /* Tighter horizontal rules */
+    hr {
+        margin-top: 8px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* TR status badges - SAME SIZE as symbol buttons */
     .tr-strong-buy {
         background-color: #00CC00;
         color: white;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
     
     .tr-buy {
         background-color: #66CC66;
         color: white;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
     
     .tr-neutral {
         background-color: #FFCC00;
         color: black;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
     
     .tr-sell {
         background-color: #FF6666;
         color: white;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
     
     .tr-strong-sell {
         background-color: #CC0000;
         color: white;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
     
     .tr-loading {
         background-color: #999999;
         color: white;
-        padding: 4px 12px;
+        padding: 5px 8px;
         border-radius: 4px;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 11px;
+        display: inline-block;
+        min-height: 28px;
+        line-height: 1.2;
+        vertical-align: middle;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -146,8 +228,8 @@ st.markdown("""
 
 AVAILABLE_COLUMNS = {
     # Basic Fields (4)
-    'symbol': {'name': 'Symbol', 'width': 1.5, 'category': 'Basic'},
-    'current_price': {'name': 'Price', 'width': 1.5, 'category': 'Basic'},
+    'symbol': {'name': 'Symbol', 'width': 0.8, 'category': 'Basic'},  # Reduced from 1.5 to 0.8
+    'current_price': {'name': 'Price', 'width': 1.0, 'category': 'Basic'},  # Reduced from 1.5
     'price_change_pct': {'name': 'Change %', 'width': 1.5, 'category': 'Basic'},
     'volume': {'name': 'Volume', 'width': 1.5, 'category': 'Basic'},
     
@@ -1362,7 +1444,7 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     st.subheader(f"📊 Stocks in {watchlist['name']}")
     
     # Create header with checkbox
-    header_cols = st.columns([0.5] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.8])
+    header_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.5])  # Match data row widths
     
     with header_cols[0]:
         st.write("☑️")
@@ -1423,7 +1505,7 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     
     # Display stocks
     for idx, stock in enumerate(stock_data):
-        data_cols = st.columns([0.5] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.8])
+        data_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.5])  # Reduced from [0.5, 0.8]
         
         # Checkbox column
         with data_cols[0]:
@@ -1439,7 +1521,8 @@ def show_watchlist_stocks_enhanced(watchlist_id):
                 # Special handling for symbol
                 if col_id == 'symbol':
                     symbol = stock.get('symbol', 'N/A')
-                    if st.button(f"🔍 {symbol}", key=f"goto_{watchlist_id}_{idx}_{symbol}", use_container_width=True):
+                    # Compact symbol display - smaller button
+                    if st.button(f"{symbol}", key=f"goto_{watchlist_id}_{idx}_{symbol}", use_container_width=True, help="View details"):
                         st.session_state.selected_symbol = symbol
                         st.switch_page("pages/1_Stocks_Analysis.py")
                 else:
@@ -1456,7 +1539,8 @@ def show_watchlist_stocks_enhanced(watchlist_id):
                 remove_stock_from_watchlist(watchlist_id, stock['symbol'])
                 st.rerun()
         
-        st.divider()
+        # Compact divider - minimal spacing
+        st.markdown("<hr style='margin: 4px 0px; border: 0; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
     
     # Summary statistics
     if 'tr_status' in columns_to_show:

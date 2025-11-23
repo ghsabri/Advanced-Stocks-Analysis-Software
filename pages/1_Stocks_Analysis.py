@@ -210,7 +210,7 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
         price_change = current_price - prev_close
         price_change_pct = (price_change / prev_close) * 100
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric(
@@ -229,6 +229,28 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
             low_52w = recent_year['Low'].min()
             high_52w = recent_year['High'].max()
             st.metric("52-Week Range", f"${low_52w:.2f} - ${high_52w:.2f}")
+        
+        with col4:
+            # TR Status (if available)
+            if 'TR_Status' in df.columns:
+                tr_status = df['TR_Status'].iloc[-1]
+                # Color-code based on status
+                if "Strong Buy" in str(tr_status):
+                    st.metric("TR Status", "🟢 Strong Buy")
+                elif "Buy" in str(tr_status) and "Strong" not in str(tr_status):
+                    st.metric("TR Status", "🟢 Buy")
+                elif "Neutral Buy" in str(tr_status):
+                    st.metric("TR Status", "🟡 Neutral Buy")
+                elif "Neutral Sell" in str(tr_status):
+                    st.metric("TR Status", "🟡 Neutral Sell")
+                elif "Sell" in str(tr_status) and "Strong" not in str(tr_status):
+                    st.metric("TR Status", "🔴 Sell")
+                elif "Strong Sell" in str(tr_status):
+                    st.metric("TR Status", "🔴 Strong Sell")
+                else:
+                    st.metric("TR Status", str(tr_status))
+            else:
+                st.metric("TR Status", "N/A")
         
         # Today's Price Range bar - Excel style (1/3 width, left-aligned)
         if not df.empty:
@@ -812,36 +834,6 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
             st.markdown(f"EMA 50 Days: {ema50_signal}")
             st.markdown("**Long Term:**")
             st.markdown(f"EMA 200 Days: {ema200_signal}")
-        
-        st.markdown("---")
-        
-        # TR Indicator
-        st.subheader("🎯 TR Indicator")
-        
-        # Check if TR data is available in df
-        if 'TR' in df.columns:
-            current_tr = df['TR'].iloc[-1]
-            
-            # Determine TR status
-            if current_tr >= 5:
-                tr_status = "Strong Buy"
-                tr_color = "green"
-            elif current_tr >= 4:
-                tr_status = "Buy"
-                tr_color = "lightgreen"
-            elif current_tr >= 3:
-                tr_status = "Neutral"
-                tr_color = "gray"
-            elif current_tr >= 2:
-                tr_status = "Sell"
-                tr_color = "orange"
-            else:
-                tr_status = "Strong Sell"
-                tr_color = "red"
-            
-            st.markdown(f"**Status:** <span style='background-color:{tr_color};padding:5px 10px;border-radius:5px;color:white'>{tr_status}</span>", unsafe_allow_html=True)
-        else:
-            st.info("TR Indicator data not available. Run TR Indicator analysis first.")
         
         st.markdown("---")
         

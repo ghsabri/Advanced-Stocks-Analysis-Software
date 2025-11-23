@@ -13,7 +13,7 @@ api_key = os.getenv('TIINGO_API_KEY')
 print(f"API Key loaded: {api_key[:10]}..." if api_key else "❌ No API key!")
 
 # Fetch AAPL data
-ticker = 'AAPL'
+ticker = 'SPY'
 url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices"
 
 headers = {
