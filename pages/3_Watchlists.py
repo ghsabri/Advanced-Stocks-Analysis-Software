@@ -263,89 +263,120 @@ st.markdown("""
         height: 1px !important;
     }
     
-    /* TR status badges - smaller and compact */
+    /* TR status badges - larger font (13px) for readability */
     .tr-strong-buy {
         background-color: #00CC00;
         color: white;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 10px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 20px;
-        line-height: 1.1;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-buy {
         background-color: #66CC66;
         color: white;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 10px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 20px;
-        line-height: 1.1;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-neutral {
         background-color: #FFCC00;
         color: black;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 10px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 20px;
-        line-height: 1.1;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-sell {
         background-color: #FF6666;
         color: white;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 10px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 20px;
-        line-height: 1.1;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-strong-sell {
         background-color: #CC0000;
         color: white;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 10px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 20px;
-        line-height: 1.1;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-loading {
         background-color: #999999;
         color: white;
-        padding: 3px 6px;
+        padding: 4px 10px;
         border-radius: 3px;
         font-weight: bold;
-        font-size: 11px;
+        font-size: 13px;
         display: inline-block;
-        min-height: 28px;
-        line-height: 1.2;
+        min-height: 24px;
+        line-height: 1.3;
         vertical-align: middle;
+    }
+    
+    /* Alignment badges for TR Indicator Daily/Weekly Scan */
+    .align-bull {
+        background-color: #00AA00;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 13px;
+        display: inline-block;
+    }
+    
+    .align-bear {
+        background-color: #CC0000;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 13px;
+        display: inline-block;
+    }
+    
+    .align-mixed {
+        background-color: #FF9900;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 13px;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================================
-# COLUMN CONFIGURATION - 32 FIELDS AVAILABLE
+# COLUMN CONFIGURATION - 35 FIELDS AVAILABLE (includes Multi-TF)
 # ============================================================================
 
 AVAILABLE_COLUMNS = {
@@ -362,6 +393,11 @@ AVAILABLE_COLUMNS = {
     'buy_point': {'name': 'Buy Point', 'width': 0.8, 'category': 'TR Indicator'},
     'stop_loss': {'name': 'Stop Loss', 'width': 0.8, 'category': 'TR Indicator'},
     'risk_percent': {'name': 'Risk %', 'width': 0.7, 'category': 'TR Indicator'},
+    
+    # Multi-Timeframe Fields (3) - NEW
+    'tr_daily': {'name': 'TR Daily', 'width': 1.2, 'category': 'Multi-TF'},
+    'tr_weekly': {'name': 'TR Weekly', 'width': 1.2, 'category': 'Multi-TF'},
+    'alignment': {'name': 'Alignment', 'width': 0.8, 'category': 'Multi-TF'},
     
     # Technical Indicators (2)
     'rsi': {'name': 'RSI', 'width': 0.6, 'category': 'Technical'},
@@ -400,6 +436,7 @@ AVAILABLE_COLUMNS = {
 PRESET_VIEWS = {
     'Quick View': ['symbol', 'price', 'price_change_pct', 'volume', 'tr_status'],
     'TR Analysis': ['symbol', 'price', 'tr_status', 'tr_value', 'buy_point', 'stop_loss', 'risk_percent'],
+    'TR Indicator Daily/Weekly Scan': ['symbol', 'tr_daily', 'tr_weekly', 'alignment'],
     'Technical': ['symbol', 'price', 'tr_status', 'rsi', 'macd', 'ema_20', 'ema_50', 'ema_200'],
     'Performance': ['symbol', 'price', 'price_change_pct', 'perf_1m', 'perf_3m', 'perf_6m', 'perf_1y'],
     'Fundamentals': ['symbol', 'price', 'market_cap', 'pe_ratio', 'beta', 'volume', 'avg_volume'],
@@ -433,6 +470,13 @@ def initialize_session_state():
     if 'stock_tr_cache' not in st.session_state:
         st.session_state.stock_tr_cache = {}
     
+    # Separate caches for TR Indicator Daily/Weekly Scan (daily and weekly)
+    if 'stock_tr_cache_daily' not in st.session_state:
+        st.session_state.stock_tr_cache_daily = {}
+    
+    if 'stock_tr_cache_weekly' not in st.session_state:
+        st.session_state.stock_tr_cache_weekly = {}
+    
     # Load from database if available
     if DATABASE_ENABLED:
         try:
@@ -442,18 +486,23 @@ def initialize_session_state():
                 
                 for wl in db_watchlists:
                     try:
-                        watchlist_id = f"watchlist_{wl['id']}"
+                        # Safety check: ensure wl is a dict
+                        if not isinstance(wl, dict):
+                            print(f"  ⚠️ Skipping invalid watchlist data: {type(wl)}")
+                            continue
+                        
+                        watchlist_id = f"watchlist_{wl.get('id', 'unknown')}"
                         if watchlist_id not in st.session_state.watchlists:
                             st.session_state.watchlists[watchlist_id] = {
-                                'id': wl['id'],
-                                'name': wl['name'],
-                                'created_at': wl['created_at'],
+                                'id': wl.get('id'),
+                                'name': wl.get('name', 'Unnamed'),
+                                'created_at': wl.get('created_at', datetime.now()),
                                 'stocks': [],
                                 'view': wl.get('view', 'Quick View'),
                                 'custom_columns': wl.get('custom_columns'),
                                 'data_source': wl.get('data_source', 'yahoo')
                             }
-                            print(f"  ✓ Loaded watchlist: {wl['name']}")
+                            print(f"  ✓ Loaded watchlist: {wl.get('name', 'Unnamed')}")
                     except Exception as e:
                         print(f"  ⚠️ Error loading watchlist {wl.get('name', 'unknown')}: {e}")
                         continue
@@ -855,6 +904,158 @@ def analyze_watchlist_batch(watchlist_id, duration_days=1825, timeframe='daily')
     return stock_data
 
 
+def calculate_alignment(tr_daily, tr_weekly):
+    """
+    Calculate alignment between Daily and Weekly TR Status
+    
+    Returns:
+        str: 'bull', 'bear', or 'mixed'
+    """
+    if not tr_daily or not tr_weekly or tr_daily == 'N/A' or tr_weekly == 'N/A':
+        return 'mixed'
+    
+    # Define bullish and bearish statuses
+    bullish = ['Strong Buy', 'Buy', 'Neutral Buy']
+    bearish = ['Strong Sell', 'Sell', 'Neutral Sell']
+    
+    # Check if daily is bullish/bearish
+    daily_bullish = any(status in str(tr_daily) for status in bullish)
+    daily_bearish = any(status in str(tr_daily) for status in bearish)
+    
+    # Check if weekly is bullish/bearish
+    weekly_bullish = any(status in str(tr_weekly) for status in bullish)
+    weekly_bearish = any(status in str(tr_weekly) for status in bearish)
+    
+    # Determine alignment
+    if daily_bullish and weekly_bullish:
+        return 'bull'
+    elif daily_bearish and weekly_bearish:
+        return 'bear'
+    else:
+        return 'mixed'
+
+
+def analyze_watchlist_multi_tf(watchlist_id, duration_days=365):
+    """
+    Multi-Timeframe Analysis: Analyze all stocks on BOTH Daily AND Weekly timeframes
+    
+    This is specifically for the "TR Indicator Daily/Weekly Scan" view.
+    """
+    watchlist = st.session_state.watchlists.get(watchlist_id)
+    if not watchlist:
+        return []
+    
+    # Handle both dict and string stock formats
+    symbols = []
+    for s in watchlist['stocks']:
+        if isinstance(s, dict):
+            symbol = s.get('symbol', '')
+        else:
+            symbol = str(s)
+        symbol = str(symbol).upper().strip()
+        if symbol:
+            symbols.append(symbol)
+    
+    if not symbols:
+        return []
+    
+    api_source = watchlist.get('data_source', 'yahoo')
+    
+    print(f"\n{'='*60}")
+    print(f"🚀 MULTI-TIMEFRAME SCAN: {watchlist['name']}")
+    print(f"   Stocks: {len(symbols)}")
+    print(f"   Timeframes: DAILY + WEEKLY")
+    print(f"{'='*60}\n")
+    
+    start_time = time.time()
+    
+    # Create progress indicators
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    total_steps = len(symbols) * 2  # Daily + Weekly for each
+    current_step = 0
+    
+    # PHASE 1: DAILY ANALYSIS
+    daily_results = {}
+    for idx, symbol in enumerate(symbols):
+        current_step += 1
+        progress_bar.progress(current_step / total_steps)
+        status_text.text(f"📊 Daily: {symbol}... ({idx + 1}/{len(symbols)})")
+        
+        # Check cache first
+        if symbol in st.session_state.stock_tr_cache_daily:
+            daily_results[symbol] = st.session_state.stock_tr_cache_daily[symbol]
+            continue
+        
+        try:
+            analyzed_df = get_shared_stock_data(symbol, duration_days, 'daily', api_source)
+            if analyzed_df is not None and not analyzed_df.empty:
+                latest = analyzed_df.iloc[-1]
+                tr_status = latest.get('TR_Status_Enhanced', latest.get('TR_Status', 'N/A'))
+                daily_results[symbol] = tr_status
+                st.session_state.stock_tr_cache_daily[symbol] = tr_status
+            else:
+                daily_results[symbol] = 'Error'
+        except Exception as e:
+            print(f"   Error analyzing {symbol} (daily): {e}")
+            daily_results[symbol] = 'Error'
+    
+    # PHASE 2: WEEKLY ANALYSIS
+    weekly_results = {}
+    for idx, symbol in enumerate(symbols):
+        current_step += 1
+        progress_bar.progress(current_step / total_steps)
+        status_text.text(f"📊 Weekly: {symbol}... ({idx + 1}/{len(symbols)})")
+        
+        # Check cache first
+        if symbol in st.session_state.stock_tr_cache_weekly:
+            weekly_results[symbol] = st.session_state.stock_tr_cache_weekly[symbol]
+            continue
+        
+        try:
+            analyzed_df = get_shared_stock_data(symbol, duration_days, 'weekly', api_source)
+            if analyzed_df is not None and not analyzed_df.empty:
+                latest = analyzed_df.iloc[-1]
+                tr_status = latest.get('TR_Status_Enhanced', latest.get('TR_Status', 'N/A'))
+                weekly_results[symbol] = tr_status
+                st.session_state.stock_tr_cache_weekly[symbol] = tr_status
+            else:
+                weekly_results[symbol] = 'Error'
+        except Exception as e:
+            print(f"   Error analyzing {symbol} (weekly): {e}")
+            weekly_results[symbol] = 'Error'
+    
+    # Clear progress indicators
+    progress_bar.empty()
+    status_text.empty()
+    
+    # PHASE 3: COMBINE RESULTS
+    stock_data = []
+    for symbol in symbols:
+        tr_daily = daily_results.get(symbol, 'N/A')
+        tr_weekly = weekly_results.get(symbol, 'N/A')
+        alignment = calculate_alignment(tr_daily, tr_weekly)
+        
+        stock_data.append({
+            'symbol': symbol,
+            'tr_daily': tr_daily,
+            'tr_weekly': tr_weekly,
+            'alignment': alignment,
+            'price': 'N/A',
+            'price_change_pct': 'N/A',
+            'tr_status': tr_daily,
+        })
+    
+    elapsed = time.time() - start_time
+    print(f"\n{'='*60}")
+    print(f"✅ MULTI-TF SCAN COMPLETE!")
+    print(f"   Total Time: {elapsed:.2f} seconds")
+    print(f"   Stocks Analyzed: {len(stock_data)}")
+    print(f"{'='*60}\n")
+    
+    return stock_data
+
+
 def extract_stock_data(df, symbol):
     """Extract relevant data from analyzed DataFrame"""
     # This function extracts the data we need for display
@@ -880,12 +1081,17 @@ def extract_stock_data(df, symbol):
         'volume': latest.get('Volume', 'N/A'),
         'avg_volume': df['Volume'].tail(20).mean() if 'Volume' in df.columns else 'N/A',
         
-        # TR fields - from TR analysis
-        'tr_status': latest.get('TR_Status', 'N/A'),
+        # TR fields - USE TR_Status_Enhanced for enhancements (↑↓✓*)
+        'tr_status': latest.get('TR_Status_Enhanced', latest.get('TR_Status', 'N/A')),
         'tr_value': 'N/A',  # TR system doesn't have a numeric value, only status
         'buy_point': latest.get('Buy_Point', 'N/A'),
         'stop_loss': latest.get('Stop_Loss', 'N/A'),
         'risk_percent': latest.get('Risk_Pct', 'N/A'),
+        
+        # Multi-TF fields (populated separately for Multi-TF view)
+        'tr_daily': latest.get('TR_Status_Enhanced', latest.get('TR_Status', 'N/A')),
+        'tr_weekly': 'N/A',
+        'alignment': 'N/A',
         
         # Technical indicators - CALCULATE them (not from TR analysis)
         'rsi': calculate_rsi(df),
@@ -951,6 +1157,60 @@ def calculate_ytd_performance(df):
         return 'N/A'
 
 
+def format_tr_badge(value):
+    """Format TR Status with colored badge - handles enhanced signals (↑↓✓*) and strips Exit/BUY markers"""
+    if value == 'N/A' or value is None or value == 'Error':
+        return '<div class="tr-loading">N/A</div>'
+    
+    # Convert to string
+    value_str = str(value)
+    
+    # Strip ALL extra markers - keep ONLY the stage name + enhancements (↑↓✓*)
+    # Remove EXIT markers (any variation)
+    value_str = re.sub(r'🔴\s*EXIT\s*', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'🔴\s*', '', value_str)
+    value_str = re.sub(r'\s+EXIT$', '', value_str, flags=re.IGNORECASE)  # EXIT at end only
+    
+    # Remove colored circle emojis AND any "BUY" that follows them
+    value_str = re.sub(r'🟢\s*BUY\b', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'🟢\s*', '', value_str)
+    value_str = re.sub(r'🟣\s*', '', value_str)
+    value_str = re.sub(r'🔵\s*', '', value_str)
+    value_str = re.sub(r'⚫\s*', '', value_str)
+    value_str = re.sub(r'⚪\s*', '', value_str)
+    
+    # Remove any stray bullet points or circles AND any "BUY" that follows them
+    value_str = re.sub(r'[●○•◦◉◎⬤]\s*BUY\b', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'[●○•◦◉◎⬤]\s*', '', value_str)
+    
+    # Remove standalone "BUY" ONLY when it directly follows an enhancement signal
+    # Pattern: enhancement char + optional space + BUY at word boundary
+    value_str = re.sub(r'([✓✔↑↓\*\+])\s+BUY\b', r'\1', value_str, flags=re.IGNORECASE)
+    
+    # Clean up multiple spaces and trim
+    value_str = re.sub(r'\s+', ' ', value_str).strip()
+    
+    # Determine base status for color (ignore enhancements)
+    if 'Strong Buy' in value_str:
+        css_class = 'tr-strong-buy'
+    elif 'Strong Sell' in value_str:
+        css_class = 'tr-strong-sell'
+    elif 'Neutral Buy' in value_str:
+        css_class = 'tr-neutral'
+    elif 'Neutral Sell' in value_str:
+        css_class = 'tr-neutral'
+    elif 'Buy' in value_str and 'Sell' not in value_str:
+        css_class = 'tr-buy'
+    elif 'Sell' in value_str:
+        css_class = 'tr-sell'
+    elif 'Neutral' in value_str:
+        css_class = 'tr-neutral'
+    else:
+        css_class = 'tr-loading'
+    
+    return f'<div class="{css_class}">{value_str}</div>'
+
+
 def format_column_value(stock, col_id):
     """Format column value for display"""
     value = stock.get(col_id, 'N/A')
@@ -970,18 +1230,26 @@ def format_column_value(stock, col_id):
             sign = '+' if value >= 0 else ''
             return f'<span style="color: {color}">{sign}{value:.2f}%</span>'
     
-    # TR Status with colored badge
+    # TR Status with colored badge (handles enhanced signals ↑↓✓*)
     if col_id == 'tr_status':
-        status_map = {
-            'Strong Buy': 'tr-strong-buy',
-            'Buy': 'tr-buy',
-            'Neutral': 'tr-neutral',
-            'Sell': 'tr-sell',
-            'Strong Sell': 'tr-strong-sell',
-            'Loading': 'tr-loading'
-        }
-        css_class = status_map.get(value, 'tr-neutral')
-        return f'<div class="{css_class}">{value}</div>'
+        return format_tr_badge(value)
+    
+    # TR Daily with colored badge (Multi-TF view)
+    if col_id == 'tr_daily':
+        return format_tr_badge(value)
+    
+    # TR Weekly with colored badge (Multi-TF view)
+    if col_id == 'tr_weekly':
+        return format_tr_badge(value)
+    
+    # Alignment badge (Multi-TF view)
+    if col_id == 'alignment':
+        if value == 'bull':
+            return '<div class="align-bull">✅ Bull</div>'
+        elif value == 'bear':
+            return '<div class="align-bear">✅ Bear</div>'
+        else:
+            return '<div class="align-mixed">⚠️ Mixed</div>'
     
     # TR Value
     if col_id == 'tr_value':
@@ -1339,29 +1607,51 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     # Now using get_shared_stock_data() which has ALL fields
     duration_days = 365  # 1 year
     
+    # Check if TR Indicator Daily/Weekly Scan view is selected
+    is_multi_tf_view = selected_view == 'TR Indicator Daily/Weekly Scan'
+    
     # Create layout: Analyze button, Export, Bulk actions
     analyze_col, export_col, bulk_col = st.columns([1, 1, 2])
     
     with analyze_col:
-        # BATCH ANALYZE BUTTON
+        # BATCH ANALYZE BUTTON - Always shows "Analyze All"
+        button_help = "Analyze ALL stocks on Daily + Weekly timeframes" if is_multi_tf_view else "Fetch and analyze ALL stocks with 1 year of data - optimized for speed!"
+        
         if st.button("🚀 Analyze All", key=f"batch_analyze_{watchlist_id}", 
                     type="primary", use_container_width=True,
-                    help="Fetch and analyze ALL stocks with 1 year of data - optimized for speed!"):
+                    help=button_help):
             
-            with st.spinner(f"🚀 Batch fetching {len(watchlist['stocks'])} stocks..."):
-                stock_data = analyze_watchlist_batch(
-                    watchlist_id,
-                    duration_days=duration_days,
-                    timeframe='daily'
-                )
-                
-                # Cache the results
-                for stock in stock_data:
-                    cache_key = f"{stock['symbol']}_tr_data"
-                    st.session_state.stock_tr_cache[cache_key] = stock
-                
-                st.success(f"✅ Analyzed {len(stock_data)} stocks!")
-                st.rerun()
+            if is_multi_tf_view:
+                # TR Indicator Daily/Weekly Scan: Analyze both Daily and Weekly
+                with st.spinner(f"🔄 Multi-TF scanning {len(watchlist['stocks'])} stocks (Daily + Weekly)..."):
+                    stock_data = analyze_watchlist_multi_tf(
+                        watchlist_id,
+                        duration_days=duration_days
+                    )
+                    
+                    # Cache the results
+                    for stock in stock_data:
+                        cache_key = f"{stock['symbol']}_tr_data"
+                        st.session_state.stock_tr_cache[cache_key] = stock
+                    
+                    st.success(f"✅ TR Indicator Daily/Weekly Scan complete: {len(stock_data)} stocks!")
+                    st.rerun()
+            else:
+                # Regular single-timeframe analysis
+                with st.spinner(f"🚀 Batch fetching {len(watchlist['stocks'])} stocks..."):
+                    stock_data = analyze_watchlist_batch(
+                        watchlist_id,
+                        duration_days=duration_days,
+                        timeframe='daily'
+                    )
+                    
+                    # Cache the results
+                    for stock in stock_data:
+                        cache_key = f"{stock['symbol']}_tr_data"
+                        st.session_state.stock_tr_cache[cache_key] = stock
+                    
+                    st.success(f"✅ Analyzed {len(stock_data)} stocks!")
+                    st.rerun()
     
     with export_col:
         # Export CSV functionality - moved here
@@ -1580,7 +1870,8 @@ def show_watchlist_stocks_enhanced(watchlist_id):
                 else:
                     formatted_value = format_column_value(stock, col_id)
                     # Fields that use HTML for coloring
-                    if col_id in ['price_change_pct', 'tr_status', 'perf_1m', 'perf_3m', 'perf_6m', 
+                    if col_id in ['price_change_pct', 'tr_status', 'tr_daily', 'tr_weekly', 'alignment',
+                                  'perf_1m', 'perf_3m', 'perf_6m', 
                                   'perf_ytd', 'perf_1y', 'perf_3y', 'perf_5y']:
                         st.markdown(formatted_value, unsafe_allow_html=True)
                     else:
@@ -1645,11 +1936,11 @@ def main():
     
     # Show batch fetching status
     if BATCH_FETCHING_AVAILABLE:
-        st.markdown("*✅ **BATCH FETCHING ENABLED***")
+        st.markdown("*✅ **BATCH FETCHING ENABLED** | 🆕 **TR Indicator Daily/Weekly Scan** now available!*")
     else:
         st.markdown("*⚠️ Sequential mode (batch fetching not available)*")
     
-    st.markdown("*Create and manage stock watchlists with **32 available fields** and custom views*")
+    st.markdown("*Create and manage stock watchlists with **35 available fields** including Daily + Weekly TR Scan*")
     st.divider()
     
     # Emergency reset button (for debugging)
@@ -1657,7 +1948,9 @@ def main():
         st.caption("**Troubleshooting Tools:**")
         if st.button("🗑️ Clear All Cache", key="clear_cache_btn"):
             st.session_state.stock_tr_cache = {}
-            st.success("✅ Cache cleared!")
+            st.session_state.stock_tr_cache_daily = {}
+            st.session_state.stock_tr_cache_weekly = {}
+            st.success("✅ All caches cleared!")
         
         if st.button("🔄 Reset Session", key="reset_session_btn"):
             keys_to_keep = ['logged_in']
@@ -1740,6 +2033,8 @@ def main():
                         # Clear cache when data source changes
                         if data_source != current_source:
                             st.session_state.stock_tr_cache = {}
+                            st.session_state.stock_tr_cache_daily = {}
+                            st.session_state.stock_tr_cache_weekly = {}
                             st.success(f"✅ Settings saved! Switched to {data_source.upper()}. Cache cleared. Click 'Analyze All' to refresh data.")
                         else:
                             st.success("✅ Settings saved!")

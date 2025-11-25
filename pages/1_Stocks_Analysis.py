@@ -6,6 +6,7 @@ Matches Excel "User Interface" worksheet layout
 import streamlit as st
 import sys
 import os
+import re
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
@@ -20,6 +21,58 @@ if src_path not in sys.path:
 
 from stock_lookup import get_stock_info, get_sector_etf
 from cached_data import get_shared_stock_data, get_simple_stock_data
+
+
+def format_tr_status_display(tr_status):
+    """
+    Format TR Status for display - strips extra markers but keeps enhancement signals (↑↓✓*+)
+    Returns: (display_text, emoji) tuple
+    """
+    if tr_status is None or tr_status == 'N/A':
+        return 'N/A', ''
+    
+    value_str = str(tr_status)
+    
+    # Strip extra markers - keep ONLY the stage name + enhancements (↑↓✓*+)
+    # Remove EXIT markers
+    value_str = re.sub(r'🔴\s*EXIT\s*', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'🔴\s*', '', value_str)
+    value_str = re.sub(r'\s+EXIT$', '', value_str, flags=re.IGNORECASE)
+    
+    # Remove colored circle emojis AND any "BUY" that follows them
+    value_str = re.sub(r'🟢\s*BUY\b', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'🟢\s*', '', value_str)
+    value_str = re.sub(r'🟣\s*', '', value_str)
+    value_str = re.sub(r'🔵\s*', '', value_str)
+    value_str = re.sub(r'⚫\s*', '', value_str)
+    value_str = re.sub(r'⚪\s*', '', value_str)
+    
+    # Remove any stray bullet points or circles AND any "BUY" that follows them
+    value_str = re.sub(r'[●○•◦◉◎⬤]\s*BUY\b', '', value_str, flags=re.IGNORECASE)
+    value_str = re.sub(r'[●○•◦◉◎⬤]\s*', '', value_str)
+    
+    # Remove standalone "BUY" ONLY when it directly follows an enhancement signal
+    value_str = re.sub(r'([✓✔↑↓\*\+])\s+BUY\b', r'\1', value_str, flags=re.IGNORECASE)
+    
+    # Clean up multiple spaces and trim
+    value_str = re.sub(r'\s+', ' ', value_str).strip()
+    
+    # Determine emoji based on status
+    if 'Strong Buy' in value_str:
+        emoji = '🟢'
+    elif 'Strong Sell' in value_str:
+        emoji = '🔴'
+    elif 'Buy' in value_str and 'Sell' not in value_str:
+        emoji = '🟢'
+    elif 'Sell' in value_str:
+        emoji = '🔴'
+    elif 'Neutral' in value_str:
+        emoji = '🟡'
+    else:
+        emoji = ''
+    
+    return value_str, emoji
+
 
 # Helper functions for technical indicators
 def calculate_macd(df):
@@ -266,7 +319,7 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
         with col4:
             # TR Status display logic:
             # 1. If passed from Watchlist (view had TR Status column) - display it
-            # 2. If TR_Status exists in df (full TR analysis was done) - display it
+            # 2. If TR_Status_Enhanced or TR_Status exists in df - display it
             # 3. Otherwise - show message to use TR Indicator page
             
             passed_tr_status = st.session_state.get('passed_tr_status', None)
@@ -277,38 +330,20 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
                 # Clear it after reading (so it doesn't persist)
                 del st.session_state['passed_tr_status']
                 
-                # Display with color coding
-                if "Strong Buy" in str(tr_status):
-                    st.metric("TR Status", "🟢 Strong Buy")
-                elif "Buy" in str(tr_status) and "Strong" not in str(tr_status):
-                    st.metric("TR Status", "🟢 Buy")
-                elif "Neutral" in str(tr_status):
-                    st.metric("TR Status", "🟡 Neutral")
-                elif "Sell" in str(tr_status) and "Strong" not in str(tr_status):
-                    st.metric("TR Status", "🔴 Sell")
-                elif "Strong Sell" in str(tr_status):
-                    st.metric("TR Status", "🔴 Strong Sell")
-                else:
-                    st.metric("TR Status", str(tr_status))
+                # Format and display with enhancement signals
+                display_text, emoji = format_tr_status_display(tr_status)
+                st.metric("TR Status", f"{emoji} {display_text}")
                     
-            elif 'TR_Status' in df.columns:
-                # TR Status from full analysis
-                tr_status = df['TR_Status'].iloc[-1]
-                # Color-code based on status
-                if "Strong Buy" in str(tr_status):
-                    st.metric("TR Status", "🟢 Strong Buy")
-                elif "Buy" in str(tr_status) and "Strong" not in str(tr_status):
-                    st.metric("TR Status", "🟢 Buy")
-                elif "Neutral Buy" in str(tr_status):
-                    st.metric("TR Status", "🟡 Neutral Buy")
-                elif "Neutral Sell" in str(tr_status):
-                    st.metric("TR Status", "🟡 Neutral Sell")
-                elif "Sell" in str(tr_status) and "Strong" not in str(tr_status):
-                    st.metric("TR Status", "🔴 Sell")
-                elif "Strong Sell" in str(tr_status):
-                    st.metric("TR Status", "🔴 Strong Sell")
+            elif 'TR_Status_Enhanced' in df.columns or 'TR_Status' in df.columns:
+                # Use TR_Status_Enhanced if available, otherwise fall back to TR_Status
+                if 'TR_Status_Enhanced' in df.columns:
+                    tr_status = df['TR_Status_Enhanced'].iloc[-1]
                 else:
-                    st.metric("TR Status", str(tr_status))
+                    tr_status = df['TR_Status'].iloc[-1]
+                
+                # Format and display with enhancement signals
+                display_text, emoji = format_tr_status_display(tr_status)
+                st.metric("TR Status", f"{emoji} {display_text}")
             else:
                 # No TR Status available - show message
                 st.markdown("**TR Status**")
