@@ -19,7 +19,7 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from stock_lookup import get_stock_info, get_sector_etf
-from cached_data import get_shared_stock_data
+from cached_data import get_shared_stock_data, get_simple_stock_data
 
 # Helper functions for technical indicators
 def calculate_macd(df):
@@ -113,23 +113,30 @@ col1, col2 = st.columns([3, 1])
 
 with col1:
     # Check if symbol was clicked from watchlist
-    default_symbol = st.session_state.get('selected_symbol', '')
-    
-    # Clear the selected symbol after reading it (so it doesn't persist)
-    if 'selected_symbol' in st.session_state:
-        # Store it temporarily for auto-update
-        clicked_symbol = st.session_state.selected_symbol
+    if 'selected_symbol' in st.session_state and st.session_state.selected_symbol:
+        # Symbol clicked from watchlist - use it and trigger auto-update
+        clicked_symbol = st.session_state.selected_symbol.upper().strip()
         del st.session_state.selected_symbol
-        # Auto-trigger update for clicked symbols
-        st.session_state['analysis_symbol'] = clicked_symbol.upper().strip()
+        
+        # Set the analysis symbol and trigger update
+        st.session_state['analysis_symbol'] = clicked_symbol
+        st.session_state['current_input_symbol'] = clicked_symbol
         st.session_state['update_triggered'] = True
+    
+    # Get the current input symbol (persists across reruns)
+    current_symbol = st.session_state.get('current_input_symbol', '')
     
     symbol = st.text_input(
         "Stock Symbol",
-        value=default_symbol,  # Pre-fill with clicked symbol or blank
+        value=current_symbol,
         placeholder="Enter stock symbol (e.g., AAPL, GOOGL, MSFT)",
-        help="Enter stock ticker symbol or click a symbol from your watchlist"
+        help="Enter stock ticker symbol or click a symbol from your watchlist",
+        key="symbol_input"
     )
+    
+    # Update current_input_symbol when user types
+    if symbol != current_symbol:
+        st.session_state['current_input_symbol'] = symbol
 
 with col2:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -137,7 +144,17 @@ with col2:
 
 # Auto-update only on button click
 if update_button and symbol:
-    st.session_state['analysis_symbol'] = symbol.upper().strip()
+    # Validate: Only single stock symbol allowed
+    symbol_clean = symbol.upper().strip()
+    
+    # Check for multiple symbols (comma, space, or semicolon separated)
+    if ',' in symbol_clean or ';' in symbol_clean or ' ' in symbol_clean:
+        st.error("❌ Please enter only ONE stock symbol. This page analyzes a single stock at a time.")
+        st.info("💡 Tip: Use Watchlists to track multiple stocks.")
+        st.stop()
+    
+    st.session_state['analysis_symbol'] = symbol_clean
+    st.session_state['current_input_symbol'] = symbol_clean
     st.session_state['update_triggered'] = True
 
 # Main analysis section
@@ -156,12 +173,28 @@ if st.session_state.get('update_triggered', False):
                 st.stop()
             
             # Get stock data
-            df = get_shared_stock_data(
-                ticker=symbol,
-                duration_days=1825,  # 5 years
-                timeframe='daily',
-                api_source='yahoo'
-            )
+            # If TR Status was passed from Watchlist, use SIMPLE fetch (faster - no TR calc)
+            # Otherwise use full TR analysis
+            has_passed_tr = 'passed_tr_status' in st.session_state and st.session_state.passed_tr_status
+            
+            if has_passed_tr:
+                # FAST PATH: Simple data fetch (no TR analysis needed)
+                # TR Status already available from Watchlist
+                print(f"⚡ Fast loading {symbol} (TR Status passed from Watchlist)")
+                df = get_simple_stock_data(
+                    ticker=symbol,
+                    duration_days=400,  # ~1.1 years to ensure 252+ trading days
+                    timeframe='daily'
+                )
+            else:
+                # FULL PATH: Complete TR analysis
+                print(f"📊 Full analysis {symbol} (TR Status not available)")
+                df = get_shared_stock_data(
+                    ticker=symbol,
+                    duration_days=400,  # ~1.1 years to ensure 252+ trading days
+                    timeframe='daily',
+                    api_source='yahoo'
+                )
             
             if df is None or df.empty:
                 st.error(f"❌ Could not get price data for {symbol}")
@@ -231,8 +264,35 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
             st.metric("52-Week Range", f"${low_52w:.2f} - ${high_52w:.2f}")
         
         with col4:
-            # TR Status (if available)
-            if 'TR_Status' in df.columns:
+            # TR Status display logic:
+            # 1. If passed from Watchlist (view had TR Status column) - display it
+            # 2. If TR_Status exists in df (full TR analysis was done) - display it
+            # 3. Otherwise - show message to use TR Indicator page
+            
+            passed_tr_status = st.session_state.get('passed_tr_status', None)
+            
+            if passed_tr_status:
+                # TR Status was passed from Watchlist
+                tr_status = passed_tr_status
+                # Clear it after reading (so it doesn't persist)
+                del st.session_state['passed_tr_status']
+                
+                # Display with color coding
+                if "Strong Buy" in str(tr_status):
+                    st.metric("TR Status", "🟢 Strong Buy")
+                elif "Buy" in str(tr_status) and "Strong" not in str(tr_status):
+                    st.metric("TR Status", "🟢 Buy")
+                elif "Neutral" in str(tr_status):
+                    st.metric("TR Status", "🟡 Neutral")
+                elif "Sell" in str(tr_status) and "Strong" not in str(tr_status):
+                    st.metric("TR Status", "🔴 Sell")
+                elif "Strong Sell" in str(tr_status):
+                    st.metric("TR Status", "🔴 Strong Sell")
+                else:
+                    st.metric("TR Status", str(tr_status))
+                    
+            elif 'TR_Status' in df.columns:
+                # TR Status from full analysis
                 tr_status = df['TR_Status'].iloc[-1]
                 # Color-code based on status
                 if "Strong Buy" in str(tr_status):
@@ -250,7 +310,9 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
                 else:
                     st.metric("TR Status", str(tr_status))
             else:
-                st.metric("TR Status", "N/A")
+                # No TR Status available - show message
+                st.markdown("**TR Status**")
+                st.caption("Use [TR Indicator](/TR_Indicator) page")
         
         # Today's Price Range bar - Excel style (1/3 width, left-aligned)
         if not df.empty:
@@ -459,7 +521,7 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
                 "MACD (26, 12, 9)": f"{macd:.2f}" if macd else "—",
                 "PPO (26, 12, 9)": f"{ppo:.2f}%" if ppo else "—",
                 "PMO (35, 20, 10)": f"{pmo:.2f}" if pmo else "—",
-                "Chaikin (20)": f"{chaikin:.4f}" if chaikin else "—"
+                "Chaikin Money Flow (20)": f"{chaikin:.4f}" if chaikin else "—"
             }
         else:
             indicators_data = {
@@ -563,89 +625,109 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
     
     with col_right:
         
-        # Markets section - TEMPORARILY DISABLED FOR SPEED
+        # Markets section - LIVE DATA WITH GRID
         st.subheader("📊 Markets")
-        st.info("📊 Market data temporarily disabled for faster loading")
         
-        # # Fetch real market data
-        # market_indices = {
-        #     'S&P 500': '^GSPC',
-        #     'Nasdaq Comp': '^IXIC',
-        #     'Nasdaq 100': '^NDX',
-        #     'Dow Jones Ind': '^DJI',
-        #     'Russell 2000 - ETF': 'IWM',
-        #     'CBOE VIX': '^VIX',
-        #     'Gold': 'GC=F',
-        #     'WTI (United States Oil)': 'CL=F'
-        # }
-        # 
-        # for name, ticker in market_indices.items():
-        #     try:
-        #         idx_df = get_shared_stock_data(ticker, duration_days=5, timeframe='daily', api_source='yahoo')
-        #         if idx_df is not None and len(idx_df) >= 2:
-        #             current_price = idx_df['Close'].iloc[-1]
-        #             prev_close = idx_df['Close'].iloc[-2]
-        #             change = current_price - prev_close
-        #             pct_change = (change / prev_close) * 100
-        #             
-        #             # Format values
-        #             price_str = f"{current_price:,.2f}"
-        #             change_str = f"{change:,.2f}"
-        #             pct_str = f"{pct_change:.2f}%"
-        #             
-        #             # Determine arrow and color
-        #             if change > 0:
-        #                 arrow = "🔼"
-        #                 change_color = "green"
-        #                 pct_color = "green"
-        #             else:
-        #                 arrow = "🔽"
-        #                 change_color = "red"
-        #                 pct_color = "red"
-        #             
-        #             # Display row with proper formatting
-        #             col1, col2, col3, col4, col5 = st.columns([2.5, 1.2, 1.2, 0.3, 1])
-        #             with col1:
-        #                 st.text(name)
-        #             with col2:
-        #                 st.text(price_str)
-        #             with col3:
-        #                 st.markdown(f"<span style='color:{change_color}'>{change_str}</span>", unsafe_allow_html=True)
-        #             with col4:
-        #                 st.markdown(arrow)
-        #             with col5:
-        #                 st.markdown(f"<span style='color:{pct_color}'>{pct_str}</span>", unsafe_allow_html=True)
-        #         else:
-        #             # Placeholder if data unavailable
-        #             col1, col2, col3, col4, col5 = st.columns([2.5, 1.2, 1.2, 0.3, 1])
-        #             with col1:
-        #                 st.text(name)
-        #             with col2:
-        #                 st.text("—")
-        #             with col3:
-        #                 st.text("—")
-        #             with col4:
-        #                 st.text("")
-        #             with col5:
-        #                 st.text("—")
-        #     except:
-        #         # Error fallback
-        #         col1, col2, col3, col4, col5 = st.columns([2.5, 1.2, 1.2, 0.3, 1])
-        #         with col1:
-        #             st.text(name)
-        #         with col2:
-        #             st.text("—")
-        #         with col3:
-        #             st.text("—")
-        #         with col4:
-        #             st.text("")
-        #         with col5:
-        #             st.text("—")
+        try:
+            from src.markets_data import fetch_markets_data_simple
+            import pandas as pd
+            
+            # Fetch markets data in ONE batch call
+            markets = fetch_markets_data_simple()
+            
+            if markets:
+                # Create DataFrame for grid display
+                markets_data = []
+                for market in markets:
+                    # Color code the text values
+                    if market['direction'] == 'up':
+                        change_display = f"<span style='color: green'>{market['arrow']} {abs(market['change']):.2f}</span>"
+                        pct_display = f"<span style='color: green'>{market['change_percent']:+.2f}%</span>"
+                    elif market['direction'] == 'down':
+                        change_display = f"<span style='color: red'>{market['arrow']} {abs(market['change']):.2f}</span>"
+                        pct_display = f"<span style='color: red'>{market['change_percent']:+.2f}%</span>"
+                    else:
+                        change_display = f"{market['arrow']} {abs(market['change']):.2f}"
+                        pct_display = f"{market['change_percent']:+.2f}%"
+                    
+                    markets_data.append({
+                        'Market': market['market'],
+                        'Price': f"{market['price']:,.2f}",
+                        'Change': change_display,
+                        'Change %': pct_display
+                    })
+                
+                df_markets = pd.DataFrame(markets_data)
+                
+                # Add CSS styling for right-aligned columns
+                st.markdown("""
+                <style>
+                    .markets-table td:nth-child(2),
+                    .markets-table td:nth-child(3),
+                    .markets-table td:nth-child(4),
+                    .markets-table th:nth-child(2),
+                    .markets-table th:nth-child(3),
+                    .markets-table th:nth-child(4) {
+                        text-align: right !important;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Display with HTML formatting and custom class
+                html_table = df_markets.to_html(escape=False, index=False, classes='markets-table')
+                st.markdown(html_table, unsafe_allow_html=True)
+                
+            else:
+                st.info("📊 Market data temporarily unavailable")
+                
+        except Exception as e:
+            st.error(f"Error loading markets: {e}")
+            st.info("📊 Market data temporarily unavailable")
         
         st.markdown("---")
         
         # Performance Table
         st.subheader("📈 Performance")
+        
+        # Dropdown aligned right, just below heading
+        _, perf_dropdown_col = st.columns([3, 1])
+        
+        with perf_dropdown_col:
+            perf_range = st.selectbox(
+                "Range",
+                ["1 Year", "3 Years", "5 Years"],
+                key="perf_range_select",
+                help="Select time range for performance comparison"
+            )
+        
+        # Determine required days for performance calculation
+        perf_duration_map = {
+            "1 Year": 400,
+            "3 Years": 1150,
+            "5 Years": 1900
+        }
+        required_duration = perf_duration_map[perf_range]
+        
+        # For performance, we use SIMPLE data (no TR analysis needed)
+        # This is separate from the main stock data used elsewhere on the page
+        perf_data_key = f"perf_data_{symbol}_{perf_range}"
+        
+        if perf_data_key not in st.session_state:
+            # Fetch simple price data for performance (fast - no TR analysis)
+            with st.spinner(f"Loading {perf_range} performance data..."):
+                perf_df = get_simple_stock_data(
+                    ticker=symbol,
+                    duration_days=required_duration,
+                    timeframe='daily'
+                )
+                if perf_df is not None and not perf_df.empty:
+                    st.session_state[perf_data_key] = perf_df
+        
+        # Use performance-specific data if available, otherwise fall back to main df
+        if perf_data_key in st.session_state:
+            perf_df = st.session_state[perf_data_key]
+        else:
+            perf_df = df
         
         # Get sector ETF
         sector_etf = get_sector_etf(symbol)
@@ -668,25 +750,35 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
             }
             
             for period, days in period_days.items():
-                if len(df) > days:
+                if len(df) >= days:  # Changed from > to >= to include exact matches
                     try:
-                        past_price = df['Close'].iloc[-days]
+                        # Use min to avoid index out of bounds
+                        idx = min(days, len(df) - 1)
+                        past_price = df['Close'].iloc[-idx]
                         ret = ((current_price - past_price) / past_price) * 100
                         returns[period] = f"{ret:+.2f}%"
                     except:
                         returns[period] = "—"
-                elif period == '5 Yr' and len(df) >= 1000:  # Fallback for 5Y if we have 4+ years
+                # Fallbacks: use earliest available data if we're close
+                elif period == '1 Yr' and len(df) >= 200:  # ~80% of 1 year
                     try:
-                        past_price = df['Close'].iloc[0]  # Use earliest available
+                        past_price = df['Close'].iloc[0]
                         ret = ((current_price - past_price) / past_price) * 100
-                        returns[period] = f"{ret:+.2f}%"
+                        returns[period] = f"{ret:+.2f}%*"  # * indicates approximate
                     except:
                         returns[period] = "—"
-                elif period == '3 Yr' and len(df) >= 630:  # Fallback for 3Y if we have 2.5+ years
+                elif period == '3 Yr' and len(df) >= 630:  # ~83% of 3 years
                     try:
-                        past_price = df['Close'].iloc[0]  # Use earliest available
+                        past_price = df['Close'].iloc[0]
                         ret = ((current_price - past_price) / past_price) * 100
-                        returns[period] = f"{ret:+.2f}%"
+                        returns[period] = f"{ret:+.2f}%*"
+                    except:
+                        returns[period] = "—"
+                elif period == '5 Yr' and len(df) >= 1000:  # ~80% of 5 years
+                    try:
+                        past_price = df['Close'].iloc[0]
+                        ret = ((current_price - past_price) / past_price) * 100
+                        returns[period] = f"{ret:+.2f}%*"
                     except:
                         returns[period] = "—"
                 else:
@@ -737,29 +829,43 @@ if 'stock_info' in st.session_state and 'stock_data' in st.session_state:
             
             return returns
         
-        # Calculate returns for stock
-        stock_returns = calculate_returns(df, ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
+        # Calculate returns for stock using PERFORMANCE data (may have more history)
+        stock_returns = calculate_returns(perf_df, ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
         
-        # Fetch comparison data with spinner
-        with st.spinner("Loading comparison data..."):
-            # Fetch SPY data and calculate returns
-            spy_returns = None
-            try:
-                spy_df = get_shared_stock_data('SPY', duration_days=1825, timeframe='daily', api_source='yahoo')
-                if spy_df is not None and not spy_df.empty:
-                    spy_returns = calculate_returns(spy_df, ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
-            except:
-                pass
+        # Fetch comparison data - use SIMPLE data (no TR analysis needed for performance)
+        # Cache SPY and sector data for the selected range
+        spy_cache_key = f"perf_spy_{perf_range}"
+        sector_cache_key = f"perf_{sector_etf}_{perf_range}" if sector_etf else None
+        
+        spy_returns = None
+        sector_returns = None
+        
+        # Fetch SPY
+        if spy_cache_key not in st.session_state:
+            with st.spinner("Loading SPY data..."):
+                try:
+                    spy_df = get_simple_stock_data('SPY', duration_days=required_duration, timeframe='daily')
+                    if spy_df is not None and not spy_df.empty:
+                        st.session_state[spy_cache_key] = spy_df
+                except:
+                    pass
+        
+        if spy_cache_key in st.session_state:
+            spy_returns = calculate_returns(st.session_state[spy_cache_key], ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
+        
+        # Fetch Sector ETF
+        if sector_etf and sector_cache_key:
+            if sector_cache_key not in st.session_state:
+                with st.spinner(f"Loading {sector_etf} data..."):
+                    try:
+                        sector_df = get_simple_stock_data(sector_etf, duration_days=required_duration, timeframe='daily')
+                        if sector_df is not None and not sector_df.empty:
+                            st.session_state[sector_cache_key] = sector_df
+                    except:
+                        pass
             
-            # Fetch Sector ETF data and calculate returns
-            sector_returns = None
-            try:
-                if sector_etf:
-                    sector_df = get_shared_stock_data(sector_etf, duration_days=1825, timeframe='daily', api_source='yahoo')
-                    if sector_df is not None and not sector_df.empty:
-                        sector_returns = calculate_returns(sector_df, ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
-            except:
-                pass
+            if sector_cache_key in st.session_state:
+                sector_returns = calculate_returns(st.session_state[sector_cache_key], ['5 days', '15 days', '1 Mo', '3 Mo', '6 Mo', '1 Yr', '3 Yr', '5 Yr', 'YTD'])
         
         # Create performance table
         performance_data = {

@@ -4,26 +4,36 @@ Home Page - Login and Introduction
 
 import yfinance as yf
 import streamlit as st
+import requests
+print("🔧 Initializing network for Yahoo Finance...")
+try:
+    # Make a simple request to Yahoo Finance domain
+    r = requests.get("https://query1.finance.yahoo.com", timeout=10)
+    print(f"✅ Yahoo Finance network initialized (Status: {r.status_code})")
+except Exception as e:
+    print(f"⚠️ Request warning: {e}")
+    print("   (This is OK, initialization should still work)")
+print("Done.")
 
 # CRITICAL FIX: Ensure yfinance cookies are initialized
 # This prevents 429 errors on fresh app start
-if 'yf_cookies_initialized' not in st.session_state:
-    try:
-        # Force yfinance to create/update its cookie files
-        # Use a reliable ticker that always works
-        test_ticker = yf.Ticker("SPY")
-        _ = test_ticker.history(period="5d")
-        st.session_state.yf_cookies_initialized = True
-    except Exception as e:
-        # If this fails, app will likely have issues
-        # but we don't want to crash on startup
-        pass
+# if 'yf_cookies_initialized' not in st.session_state:
+#     try:
+#         # Force yfinance to create/update its cookie files
+#         # Use a reliable ticker that always works
+#         test_ticker = yf.Ticker("SPY")
+#         _ = test_ticker.history(period="5d")
+#         st.session_state.yf_cookies_initialized = True
+#     except Exception as e:
+#         # If this fails, app will likely have issues
+#         # but we don't want to crash on startup
+#         pass
 
 # Now continue with normal imports and app code
 
 
 st.set_page_config(
-    page_title="MJ Software LLC - Stock Analysis Platform",
+    page_title="Advanced Stock Analysis",
     page_icon="📈",
     layout="wide"
 )
