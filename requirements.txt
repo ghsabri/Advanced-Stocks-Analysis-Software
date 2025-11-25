@@ -30,6 +30,9 @@ xgboost>=2.0.0
 python-dotenv>=1.0.0
 pytz>=2023.3
 
+# System utilities
+setuptools>=69.0.0
+
 # Optional (if you use these)
 # ta-lib  # Technical analysis library (requires separate installation)
 # openpyxl  # Excel file support
