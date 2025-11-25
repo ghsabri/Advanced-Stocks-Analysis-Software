@@ -53,7 +53,7 @@ from tr_enhanced import (
     add_signal_markers,
     detect_and_adjust_splits
 )
-from universal_cache import get_stock_data
+from universal_cache import get_stock_data, clear_cache as clear_universal_cache
 
 # Import the NEW batch fetcher module
 try:
@@ -755,7 +755,7 @@ def calculate_ema(df, period):
 # BATCH ANALYSIS FUNCTION - NEW!
 # ============================================================================
 
-def analyze_watchlist_batch(watchlist_id, duration_days=1825, timeframe='daily'):
+def analyze_watchlist_batch(watchlist_id, duration_days=400, timeframe='daily'):
     """
     Analyze entire watchlist using BATCH FETCHING - 10x FASTER!
     
@@ -935,7 +935,7 @@ def calculate_alignment(tr_daily, tr_weekly):
         return 'mixed'
 
 
-def analyze_watchlist_multi_tf(watchlist_id, duration_days=365):
+def analyze_watchlist_multi_tf(watchlist_id, duration_days=400):
     """
     Multi-Timeframe Analysis: Analyze all stocks on BOTH Daily AND Weekly timeframes
     
@@ -1602,10 +1602,9 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     
     st.subheader(f"📊 Stocks in Watchlist ({len(watchlist['stocks'])})")
     
-    # Use 1 year for faster watchlist analysis
-    # The N/A issue was NOT duration - it was missing fields from incomplete TR analysis
-    # Now using get_shared_stock_data() which has ALL fields
-    duration_days = 365  # 1 year
+    # Use ~1.1 years for watchlist analysis (matches Stocks Analysis page)
+    # This ensures consistent caching and TR calculations
+    duration_days = 400  # Match Stocks Analysis page
     
     # Check if TR Indicator Daily/Weekly Scan view is selected
     is_multi_tf_view = selected_view == 'TR Indicator Daily/Weekly Scan'
@@ -1947,12 +1946,29 @@ def main():
     with st.sidebar.expander("🔧 Advanced", expanded=False):
         st.caption("**Troubleshooting Tools:**")
         if st.button("🗑️ Clear All Cache", key="clear_cache_btn"):
+            # Clear session state caches
             st.session_state.stock_tr_cache = {}
             st.session_state.stock_tr_cache_daily = {}
             st.session_state.stock_tr_cache_weekly = {}
-            st.success("✅ All caches cleared!")
+            # Clear Streamlit's function cache (get_shared_stock_data, etc.)
+            st.cache_data.clear()
+            # Clear universal cache (.pkl files on disk)
+            try:
+                clear_universal_cache()
+            except Exception as e:
+                print(f"Warning: Could not clear universal cache: {e}")
+            st.success("✅ All caches cleared (session + Streamlit + disk)!")
+            st.rerun()
         
         if st.button("🔄 Reset Session", key="reset_session_btn"):
+            # Clear Streamlit's function cache first
+            st.cache_data.clear()
+            # Clear universal cache (.pkl files on disk)
+            try:
+                clear_universal_cache()
+            except Exception as e:
+                print(f"Warning: Could not clear universal cache: {e}")
+            # Then clear session state
             keys_to_keep = ['logged_in']
             keys_to_delete = [k for k in st.session_state.keys() if k not in keys_to_keep]
             for key in keys_to_delete:
@@ -2030,12 +2046,17 @@ def main():
                     if st.button("Save Settings", key=f"save_settings_{st.session_state.active_watchlist}"):
                         rename_watchlist(st.session_state.active_watchlist, new_name)
                         st.session_state.watchlists[st.session_state.active_watchlist]['data_source'] = data_source
-                        # Clear cache when data source changes
+                        # Clear ALL caches when data source changes
                         if data_source != current_source:
                             st.session_state.stock_tr_cache = {}
                             st.session_state.stock_tr_cache_daily = {}
                             st.session_state.stock_tr_cache_weekly = {}
-                            st.success(f"✅ Settings saved! Switched to {data_source.upper()}. Cache cleared. Click 'Analyze All' to refresh data.")
+                            st.cache_data.clear()
+                            try:
+                                clear_universal_cache()
+                            except Exception as e:
+                                print(f"Warning: Could not clear universal cache: {e}")
+                            st.success(f"✅ Settings saved! Switched to {data_source.upper()}. All caches cleared. Click 'Analyze All' to refresh data.")
                         else:
                             st.success("✅ Settings saved!")
                         st.rerun()
