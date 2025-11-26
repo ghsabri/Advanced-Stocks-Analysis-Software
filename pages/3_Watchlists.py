@@ -1390,19 +1390,20 @@ def show_add_stock_form(watchlist_id):
     
     st.subheader("➕ Add Stocks")
     
-    col1, col2 = st.columns([3, 1])
+    st.markdown("Enter stock symbol(s)")
+    col1, col2 = st.columns([4, 1])
     
     with col1:
         stock_input = st.text_input(
             "Enter stock symbol(s)",
             placeholder="Single: AAPL  OR  Bulk: AAPL, MSFT, GOOGL, TSLA",
             key=f"add_stock_input_{watchlist_id}",
-            help="Enter one symbol or multiple separated by commas"
+            help="Enter one symbol or multiple separated by commas",
+            label_visibility="collapsed"
         )
     
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}", use_container_width=True)
+        add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}")
     
     if add_button and stock_input:
         # Split by comma for bulk add

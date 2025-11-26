@@ -47,18 +47,11 @@ with st.sidebar:
     if 'api_source' not in st.session_state:
         st.session_state['api_source'] = 'Yahoo Finance'
     
-    data_source = st.radio(
-        "Data Source",
-        ["Yahoo Finance", "Tiingo API"],
-        index=0 if st.session_state['api_source'] == 'Yahoo Finance' else 1,
-        help="Yahoo: Free, unlimited\nTiingo: Requires API key, more data"
-    )
-    
-    # Update session state
-    st.session_state['api_source'] = data_source
+    # Currently only Yahoo Finance is enabled
+    st.session_state['api_source'] = 'Yahoo Finance'
     
     st.markdown("---")
-    st.info(f"📡 Current: **{data_source}**")
+    st.info(f"📡 Data Source: **Yahoo Finance**")
     
     st.markdown("---")
     
@@ -460,12 +453,7 @@ else:
     Enter a stock symbol above to get started with:
     - **TR Indicator Analysis**: Our proprietary trend recognition algorithm
     - **6-Stage Classification**: Strong Buy, Buy, Neutral Buy, Neutral Sell, Sell, Strong Sell
-    - **Technical Indicators**: EMAs, PPO, PMO and more
     - **Signal Distribution**: See how the stock has performed over time
-    
-    **Example symbols to try:** AAPL, TSLA, GOOGL, NVDA, META
-    
-    **💡 Tip:** Use the sidebar to switch between Yahoo Finance (free, unlimited) and Tiingo (professional data)
     """)
     
     st.markdown("---")
@@ -475,26 +463,20 @@ else:
     
     with col1:
         st.markdown("""
-        **🟢 Strong Buy Example**
+        **🟢 Strong Buy**
         - Stage 3 Uptrend
-        - All EMAs aligned
-        - PPO strongly positive
         """)
     
     with col2:
         st.markdown("""
-        **🟡 Neutral Example**
+        **🟡 Neutral**
         - Mixed signals
-        - EMAs crossing
-        - Consolidation phase
         """)
     
     with col3:
         st.markdown("""
-        **🔴 Sell Example**
+        **🔴 Sell**
         - Stage 2 Downtrend
-        - Declining EMAs
-        - PPO negative
         """)
 
 # Footer

@@ -377,7 +377,7 @@ def find_ichimoku_signals(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30)
 
 def find_enhanced_tr_signals(df, tr_data, ema_13, ema_30, senkou_a, senkou_b):
     """
-    Find buy/sell signals for Enhanced TR Signal strategy
+    Find buy/sell signals for TR / Ichimoku Combo Strategy strategy
     
     BUY Signal (ALL conditions must be TRUE):
     1. TR Status = "Strong Buy" (3rd stage uptrend)
@@ -1668,7 +1668,7 @@ def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30,
 def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema_period_2,
                               buy_signals, sell_signals, signal_details, timeframe='Daily'):
     """
-    Create Enhanced TR Signal chart
+    Create TR / Ichimoku Combo Strategy chart
     
     Display:
     - Candlestick price chart
@@ -1739,10 +1739,10 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
         hovertemplate=f'EMA {ema_period_2}: $%{{y:.2f}}<extra></extra>'
     ))
     
-    # Add BUY signals (green triangle up)
+    # Add BUY signals (green diamond)
     if buy_signals:
         buy_dates = [dates[i] for i in buy_signals]
-        buy_prices = [df['Low'].iloc[i] * 0.98 for i in buy_signals]  # Below candle
+        buy_prices = [df['Close'].iloc[i] for i in buy_signals]  # At close price
         buy_hover = []
         
         for i in buy_signals:
@@ -1768,19 +1768,19 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
             mode='markers',
             name='BUY Signal',
             marker=dict(
-                symbol='triangle-up',
-                size=15,
-                color='#00C853',  # Green
-                line=dict(color='white', width=1)
+                symbol='diamond',
+                size=10,
+                color='green',
+                line=dict(color='darkgreen', width=1.5)
             ),
             hovertext=buy_hover,
             hoverinfo='text'
         ))
     
-    # Add SELL signals (red triangle down)
+    # Add SELL signals (red diamond)
     if sell_signals:
         sell_dates = [dates[i] for i in sell_signals]
-        sell_prices = [df['High'].iloc[i] * 1.02 for i in sell_signals]  # Above candle
+        sell_prices = [df['Close'].iloc[i] for i in sell_signals]  # At close price
         sell_hover = []
         
         for i in sell_signals:
@@ -1806,10 +1806,10 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
             mode='markers',
             name='SELL Signal',
             marker=dict(
-                symbol='triangle-down',
-                size=15,
-                color='#FF1744',  # Red
-                line=dict(color='white', width=1)
+                symbol='diamond',
+                size=10,
+                color='red',
+                line=dict(color='darkred', width=1.5)
             ),
             hovertext=sell_hover,
             hoverinfo='text'
@@ -1818,7 +1818,7 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
     # Update layout
     fig.update_layout(
         title=dict(
-            text=f'📊 {stock_symbol} - Enhanced TR Signal Strategy ({timeframe})',
+            text=f'📊 {stock_symbol} - TR / Ichimoku Combo Strategy ({timeframe})',
             font=dict(size=18)
         ),
         xaxis_title="Date",
@@ -2279,7 +2279,7 @@ col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     indicator_choice = st.selectbox(
         "Indicator:",
-        ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend", "Enhanced TR Signal"],
+        ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend", "TR / Ichimoku Combo Strategy"],
         help="Select technical indicator to display"
     )
 
@@ -2413,7 +2413,7 @@ indicator_params = {
     "SuperTrend": {
         "has_signals": True  # Price/SuperTrend crossover signals
     },
-    "Enhanced TR Signal": {
+    "TR / Ichimoku Combo Strategy": {
         "has_signals": True  # TR + Ichimoku + EMA combined strategy
     }
 }
@@ -2631,38 +2631,13 @@ elif indicator_choice == "SuperTrend":
 - **Current: {atr_period} period, {atr_multiplier}x multiplier**
 """)
 
-elif indicator_choice == "Enhanced TR Signal":
-    ema_display_info = "EMA 50 & EMA 200" if timeframe == "Daily" else "EMA 10 & EMA 30"
-    st.info(f"""
-**How to read this chart:**
+elif indicator_choice == "TR / Ichimoku Combo Strategy":
+    st.info("""
+**TR / Ichimoku Combo Strategy** - A conservative, high-quality signal system that combines multiple technical indicators to identify strong trend entries and exits.
 
-**Enhanced TR Signal Strategy** combines the proprietary TR Indicator with Ichimoku Cloud and EMA momentum for higher-confidence signals.
+**Chart:** Candlesticks with EMA 50/200 (Daily) or 10/30 (Weekly) | Green ◆ = BUY | Red ◆ = SELL
 
-**Components Displayed:**
-- **Candlesticks:** Price action
-- **Blue line:** {ema_display_info.split(' & ')[0]} (trend context)
-- **Orange line:** {ema_display_info.split(' & ')[1]} (trend context)
-- **Green ▲:** BUY signals
-- **Red ▼:** SELL signals
-
-**🟢 BUY SIGNAL (All 4 conditions must be TRUE):**
-1. TR Status = "Strong Buy" (3rd stage uptrend)
-2. Fresh entry (↑ arrow - just entered Strong Buy stage)
-3. EMA 13 > EMA 30 (bullish momentum)
-4. Price is ABOVE the Ichimoku Cloud
-
-**🔴 SELL SIGNAL (All 3 conditions must be TRUE):**
-1. TR Status in downtrend (Neutral Sell, Sell, or Strong Sell)
-2. EMA 13 < EMA 30 (bearish momentum)
-3. Price is AT or BELOW the Ichimoku Cloud
-
-**Why This Strategy Works:**
-- **TR Indicator:** Confirms trend strength and stage
-- **Fresh Entry (↑):** Catches the beginning of strong moves
-- **EMA Crossover:** Confirms momentum direction
-- **Ichimoku Cloud:** Validates price position relative to support/resistance
-
-**Note:** This is a MORE CONSERVATIVE strategy than Ichimoku-only signals. Signals are rarer but higher quality.
+*Signals alternate (BUY→SELL→BUY) - fewer signals but higher confidence.*
 """)
 
 # ============================================================================
@@ -2835,8 +2810,8 @@ if update_button:
                     ml_results=ml_results
                 )
             
-            elif indicator_choice == "Enhanced TR Signal":
-                # Enhanced TR Signal Strategy
+            elif indicator_choice == "TR / Ichimoku Combo Strategy":
+                # TR / Ichimoku Combo Strategy Strategy
                 # Combines: TR Indicator + Ichimoku Cloud + EMA Crossover
                 
                 # Ensure minimum 1 year of data for TR analysis
@@ -2936,9 +2911,9 @@ if update_button:
 if 'indicator_chart_fig' in st.session_state:
     st.plotly_chart(st.session_state['indicator_chart_fig'], use_container_width=True)
     
-    # Display Enhanced TR Signal table if available
+    # Display TR / Ichimoku Combo Strategy table if available
     if 'indicator_chart_data' in st.session_state:
-        if st.session_state['indicator_chart_data'].get('indicator') == 'Enhanced TR Signal':
+        if st.session_state['indicator_chart_data'].get('indicator') == 'TR / Ichimoku Combo Strategy':
             if 'enhanced_tr_signals' in st.session_state and st.session_state['enhanced_tr_signals']:
                 st.markdown("### 📋 Recent Signals (Last 20)")
                 
