@@ -21,6 +21,7 @@ if src_path not in sys.path:
 
 from cached_data import get_shared_stock_data
 from ml_ichimoku_predictor import predict_ichimoku_confidence
+from tr_enhanced import analyze_stock_complete_tr
 
 st.set_page_config(
     page_title="Indicator Chart - MJ Software",
@@ -372,6 +373,173 @@ def find_ichimoku_signals(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30)
                         sell_signals.append(i)
     
     return buy_signals, sell_signals
+
+
+def find_enhanced_tr_signals(df, tr_data, ema_13, ema_30, senkou_a, senkou_b):
+    """
+    Find buy/sell signals for Enhanced TR Signal strategy
+    
+    BUY Signal (ALL conditions must be TRUE):
+    1. TR Status = "Strong Buy" (3rd stage uptrend)
+    2. TR has ↑ arrow (just entered this stage - fresh signal)
+    3. EMA 13 > EMA 30 (momentum confirmation)
+    4. Price > Ichimoku Cloud (above both Senkou Span A and B)
+    
+    SELL Signal (ALL conditions must be TRUE):
+    1. TR Status in downtrend ("Neutral Sell", "Sell", or "Strong Sell")
+    2. EMA 13 < EMA 30 (bearish momentum)
+    3. Price ≤ Ichimoku Cloud (at or below cloud top)
+    
+    ALTERNATING SIGNALS:
+    - After a BUY signal, subsequent BUY signals are ignored until a SELL signal occurs
+    - After a SELL signal, subsequent SELL signals are ignored until a BUY signal occurs
+    
+    Args:
+        df: Price DataFrame with Date, Close, etc.
+        tr_data: DataFrame from analyze_stock_complete_tr with TR_Status, TR_Status_Enhanced
+        ema_13: Series - 13-period EMA (for signal logic)
+        ema_30: Series - 30-period EMA (for signal logic)
+        senkou_a: Series - Ichimoku Senkou Span A
+        senkou_b: Series - Ichimoku Senkou Span B
+    
+    Returns:
+        buy_signals: list of indices where buy signals occur
+        sell_signals: list of indices where sell signals occur
+        signal_details: list of dicts with signal information
+    """
+    buy_signals = []
+    sell_signals = []
+    signal_details = []
+    
+    # Downtrend statuses for sell signals
+    downtrend_statuses = ['Neutral Sell', 'Sell', 'Strong Sell']
+    
+    # Track position state for alternating signals
+    # None = no position, 'BUY' = in long position (waiting for SELL), 'SELL' = out (waiting for BUY)
+    last_signal = None
+    
+    # Need at least some data
+    if len(df) < 2 or tr_data is None or tr_data.empty:
+        return buy_signals, sell_signals, signal_details
+    
+    # Align TR data with price data by date
+    tr_data_copy = tr_data.copy()
+    tr_data_copy['Date'] = pd.to_datetime(tr_data_copy['Date'])
+    df_copy = df.copy()
+    if 'Date' in df_copy.columns:
+        df_copy['Date_dt'] = pd.to_datetime(df_copy['Date'])
+    else:
+        df_copy['Date_dt'] = pd.to_datetime(df_copy.index)
+    
+    for i in range(1, len(df)):
+        try:
+            # Get current values
+            current_date = df_copy['Date_dt'].iloc[i]
+            current_price = df['Close'].iloc[i]
+            
+            # Find matching TR data row
+            tr_match = tr_data_copy[tr_data_copy['Date'] == current_date]
+            if tr_match.empty:
+                # Try matching by index position if dates don't align perfectly
+                if i < len(tr_data_copy):
+                    tr_row = tr_data_copy.iloc[i]
+                else:
+                    continue
+            else:
+                tr_row = tr_match.iloc[0]
+            
+            # Get TR status
+            tr_status = tr_row.get('TR_Status', '')
+            tr_status_enhanced = tr_row.get('TR_Status_Enhanced', '')
+            
+            # Check for arrow (↑ indicates fresh entry into uptrend stage)
+            has_up_arrow = '↑' in str(tr_status_enhanced)
+            
+            # Get EMA values
+            ema13_val = ema_13.iloc[i] if pd.notna(ema_13.iloc[i]) else None
+            ema30_val = ema_30.iloc[i] if pd.notna(ema_30.iloc[i]) else None
+            
+            # Get cloud boundaries
+            span_a = senkou_a.iloc[i] if pd.notna(senkou_a.iloc[i]) else None
+            span_b = senkou_b.iloc[i] if pd.notna(senkou_b.iloc[i]) else None
+            
+            # Skip if missing data
+            if ema13_val is None or ema30_val is None or span_a is None or span_b is None:
+                continue
+            
+            cloud_top = max(span_a, span_b)
+            cloud_bottom = min(span_a, span_b)
+            
+            # ═══════════════════════════════════════════════════════════════
+            # BUY SIGNAL CHECK
+            # ═══════════════════════════════════════════════════════════════
+            # Only check for BUY if last signal was not BUY (alternating)
+            if last_signal != 'BUY':
+                # Condition 1: TR Status = "Strong Buy"
+                is_strong_buy = tr_status == 'Strong Buy'
+                
+                # Condition 2: Has ↑ arrow (fresh entry)
+                # Condition 3: EMA 13 > EMA 30
+                ema_bullish = ema13_val > ema30_val
+                
+                # Condition 4: Price > Cloud (above both spans)
+                price_above_cloud = current_price > cloud_top
+                
+                if is_strong_buy and has_up_arrow and ema_bullish and price_above_cloud:
+                    buy_signals.append(i)
+                    signal_details.append({
+                        'index': i,
+                        'date': df['Date'].iloc[i] if 'Date' in df.columns else str(df.index[i]),
+                        'signal': 'BUY',
+                        'price': current_price,
+                        'tr_status': tr_status_enhanced,
+                        'ema_13': ema13_val,
+                        'ema_30': ema30_val,
+                        'cloud_position': 'Above'
+                    })
+                    last_signal = 'BUY'  # Update state - now waiting for SELL
+                    continue  # Skip sell check for this bar
+            
+            # ═══════════════════════════════════════════════════════════════
+            # SELL SIGNAL CHECK
+            # ═══════════════════════════════════════════════════════════════
+            # Only check for SELL if last signal was not SELL (alternating)
+            if last_signal != 'SELL':
+                # Condition 1: TR Status in downtrend
+                is_downtrend = tr_status in downtrend_statuses
+                
+                # Condition 2: EMA 13 < EMA 30
+                ema_bearish = ema13_val < ema30_val
+                
+                # Condition 3: Price ≤ Cloud top
+                price_at_or_below_cloud = current_price <= cloud_top
+                
+                if is_downtrend and ema_bearish and price_at_or_below_cloud:
+                    sell_signals.append(i)
+                    
+                    # Determine cloud position for display
+                    if current_price < cloud_bottom:
+                        cloud_pos = 'Below'
+                    else:
+                        cloud_pos = 'Inside'
+                    
+                    signal_details.append({
+                        'index': i,
+                        'date': df['Date'].iloc[i] if 'Date' in df.columns else str(df.index[i]),
+                        'signal': 'SELL',
+                        'price': current_price,
+                        'tr_status': tr_status_enhanced,
+                        'ema_13': ema13_val,
+                        'ema_30': ema30_val,
+                        'cloud_position': cloud_pos
+                    })
+                    last_signal = 'SELL'  # Update state - now waiting for BUY
+        
+        except Exception as e:
+            # Skip any rows with errors
+            continue
+    
+    return buy_signals, sell_signals, signal_details
 
 
 def get_ml_confidence_for_signals(df, buy_signals, sell_signals, ema_13, ema_30, ema_200, senkou_a, senkou_b):
@@ -1497,6 +1665,213 @@ def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30,
     return fig
 
 
+def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema_period_2,
+                              buy_signals, sell_signals, signal_details, timeframe='Daily'):
+    """
+    Create Enhanced TR Signal chart
+    
+    Display:
+    - Candlestick price chart
+    - EMA lines (50/200 for Daily, 10/30 for Weekly) - for visual trend context
+    - Buy signals (green triangles)
+    - Sell signals (red triangles)
+    
+    Note: Ichimoku cloud is NOT plotted (used only for signal calculation)
+    
+    Args:
+        df: Price DataFrame
+        ema_display_1: First EMA to display (50 for Daily, 10 for Weekly)
+        ema_display_2: Second EMA to display (200 for Daily, 30 for Weekly)
+        ema_period_1: Period label for first EMA
+        ema_period_2: Period label for second EMA
+        buy_signals: List of indices for buy signals
+        sell_signals: List of indices for sell signals
+        signal_details: List of dicts with signal information
+        timeframe: 'Daily' or 'Weekly'
+    """
+    
+    # Ensure index is datetime
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df = df.copy()
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df.set_index('Date', inplace=True)
+        else:
+            df.index = pd.to_datetime(df.index)
+    
+    # Get dates and stock symbol
+    dates = df.index
+    stock_symbol = df["Symbol"].iloc[0] if "Symbol" in df.columns else "Stock"
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add candlestick chart
+    fig.add_trace(go.Candlestick(
+        x=dates,
+        open=df['Open'],
+        high=df['High'],
+        low=df['Low'],
+        close=df['Close'],
+        name='Price',
+        increasing_line_color='#26a69a',
+        decreasing_line_color='#ef5350'
+    ))
+    
+    # Add EMA lines (display EMAs - not the signal EMAs)
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=ema_display_1,
+        mode='lines',
+        name=f'EMA {ema_period_1}',
+        line=dict(color='#2196F3', width=1.5),  # Blue
+        opacity=0.8,
+        hovertemplate=f'EMA {ema_period_1}: $%{{y:.2f}}<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=ema_display_2,
+        mode='lines',
+        name=f'EMA {ema_period_2}',
+        line=dict(color='#FF9800', width=1.5),  # Orange
+        opacity=0.8,
+        hovertemplate=f'EMA {ema_period_2}: $%{{y:.2f}}<extra></extra>'
+    ))
+    
+    # Add BUY signals (green triangle up)
+    if buy_signals:
+        buy_dates = [dates[i] for i in buy_signals]
+        buy_prices = [df['Low'].iloc[i] * 0.98 for i in buy_signals]  # Below candle
+        buy_hover = []
+        
+        for i in buy_signals:
+            # Find signal detail
+            detail = next((d for d in signal_details if d['index'] == i), None)
+            if detail:
+                hover_text = (
+                    f"<b>🟢 BUY SIGNAL</b><br>"
+                    f"Date: {detail['date']}<br>"
+                    f"Price: ${detail['price']:.2f}<br>"
+                    f"TR Status: {detail['tr_status']}<br>"
+                    f"EMA 13: ${detail['ema_13']:.2f}<br>"
+                    f"EMA 30: ${detail['ema_30']:.2f}<br>"
+                    f"Cloud: {detail['cloud_position']}"
+                )
+            else:
+                hover_text = f"BUY @ ${df['Close'].iloc[i]:.2f}"
+            buy_hover.append(hover_text)
+        
+        fig.add_trace(go.Scatter(
+            x=buy_dates,
+            y=buy_prices,
+            mode='markers',
+            name='BUY Signal',
+            marker=dict(
+                symbol='triangle-up',
+                size=15,
+                color='#00C853',  # Green
+                line=dict(color='white', width=1)
+            ),
+            hovertext=buy_hover,
+            hoverinfo='text'
+        ))
+    
+    # Add SELL signals (red triangle down)
+    if sell_signals:
+        sell_dates = [dates[i] for i in sell_signals]
+        sell_prices = [df['High'].iloc[i] * 1.02 for i in sell_signals]  # Above candle
+        sell_hover = []
+        
+        for i in sell_signals:
+            # Find signal detail
+            detail = next((d for d in signal_details if d['index'] == i), None)
+            if detail:
+                hover_text = (
+                    f"<b>🔴 SELL SIGNAL</b><br>"
+                    f"Date: {detail['date']}<br>"
+                    f"Price: ${detail['price']:.2f}<br>"
+                    f"TR Status: {detail['tr_status']}<br>"
+                    f"EMA 13: ${detail['ema_13']:.2f}<br>"
+                    f"EMA 30: ${detail['ema_30']:.2f}<br>"
+                    f"Cloud: {detail['cloud_position']}"
+                )
+            else:
+                hover_text = f"SELL @ ${df['Close'].iloc[i]:.2f}"
+            sell_hover.append(hover_text)
+        
+        fig.add_trace(go.Scatter(
+            x=sell_dates,
+            y=sell_prices,
+            mode='markers',
+            name='SELL Signal',
+            marker=dict(
+                symbol='triangle-down',
+                size=15,
+                color='#FF1744',  # Red
+                line=dict(color='white', width=1)
+            ),
+            hovertext=sell_hover,
+            hoverinfo='text'
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title=dict(
+            text=f'📊 {stock_symbol} - Enhanced TR Signal Strategy ({timeframe})',
+            font=dict(size=18)
+        ),
+        xaxis_title="Date",
+        yaxis_title="Price ($)",
+        template="plotly_white",
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        xaxis=dict(
+            rangeslider=dict(visible=False),
+            type='date'
+        ),
+        height=650,
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    # Update axes
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor='lightgray',
+        showline=True,
+        linecolor='black'
+    )
+    
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='lightgray',
+        showline=True,
+        linecolor='black'
+    )
+    
+    # Add signal count annotation
+    buy_count = len(buy_signals)
+    sell_count = len(sell_signals)
+    
+    fig.add_annotation(
+        text=f"Signals: 🟢 {buy_count} BUY | 🔴 {sell_count} SELL",
+        xref="paper", yref="paper",
+        x=0, y=1.08,
+        showarrow=False,
+        font=dict(size=12),
+        align="left"
+    )
+    
+    return fig
+
+
 def create_simple_indicator_chart(df, indicator_name, indicator_data, timeframe="Daily"):
     """
     Create dual-panel chart WITHOUT buy/sell signals
@@ -1904,7 +2279,7 @@ col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     indicator_choice = st.selectbox(
         "Indicator:",
-        ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend"],
+        ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend", "Enhanced TR Signal"],
         help="Select technical indicator to display"
     )
 
@@ -2037,6 +2412,9 @@ indicator_params = {
     },
     "SuperTrend": {
         "has_signals": True  # Price/SuperTrend crossover signals
+    },
+    "Enhanced TR Signal": {
+        "has_signals": True  # TR + Ichimoku + EMA combined strategy
     }
 }
 
@@ -2253,6 +2631,40 @@ elif indicator_choice == "SuperTrend":
 - **Current: {atr_period} period, {atr_multiplier}x multiplier**
 """)
 
+elif indicator_choice == "Enhanced TR Signal":
+    ema_display_info = "EMA 50 & EMA 200" if timeframe == "Daily" else "EMA 10 & EMA 30"
+    st.info(f"""
+**How to read this chart:**
+
+**Enhanced TR Signal Strategy** combines the proprietary TR Indicator with Ichimoku Cloud and EMA momentum for higher-confidence signals.
+
+**Components Displayed:**
+- **Candlesticks:** Price action
+- **Blue line:** {ema_display_info.split(' & ')[0]} (trend context)
+- **Orange line:** {ema_display_info.split(' & ')[1]} (trend context)
+- **Green ▲:** BUY signals
+- **Red ▼:** SELL signals
+
+**🟢 BUY SIGNAL (All 4 conditions must be TRUE):**
+1. TR Status = "Strong Buy" (3rd stage uptrend)
+2. Fresh entry (↑ arrow - just entered Strong Buy stage)
+3. EMA 13 > EMA 30 (bullish momentum)
+4. Price is ABOVE the Ichimoku Cloud
+
+**🔴 SELL SIGNAL (All 3 conditions must be TRUE):**
+1. TR Status in downtrend (Neutral Sell, Sell, or Strong Sell)
+2. EMA 13 < EMA 30 (bearish momentum)
+3. Price is AT or BELOW the Ichimoku Cloud
+
+**Why This Strategy Works:**
+- **TR Indicator:** Confirms trend strength and stage
+- **Fresh Entry (↑):** Catches the beginning of strong moves
+- **EMA Crossover:** Confirms momentum direction
+- **Ichimoku Cloud:** Validates price position relative to support/resistance
+
+**Note:** This is a MORE CONSERVATIVE strategy than Ichimoku-only signals. Signals are rarer but higher quality.
+""")
+
 # ============================================================================
 # GENERATE CHART
 # ============================================================================
@@ -2422,6 +2834,69 @@ if update_button:
                     timeframe=timeframe,
                     ml_results=ml_results
                 )
+            
+            elif indicator_choice == "Enhanced TR Signal":
+                # Enhanced TR Signal Strategy
+                # Combines: TR Indicator + Ichimoku Cloud + EMA Crossover
+                
+                # Ensure minimum 1 year of data for TR analysis
+                actual_duration = max(365, duration_days)
+                
+                # Fetch TR analysis data
+                try:
+                    with st.spinner("🔄 Calculating TR Indicator..."):
+                        tr_data = analyze_stock_complete_tr(
+                            ticker=symbol,
+                            timeframe=timeframe.lower(),
+                            duration_days=actual_duration
+                        )
+                except Exception as e:
+                    st.error(f"❌ Error calculating TR Indicator: {str(e)}")
+                    st.stop()
+                
+                if tr_data is None or tr_data.empty:
+                    st.error(f"❌ Could not calculate TR Indicator for {symbol}")
+                    st.stop()
+                
+                # Calculate Ichimoku components (for signal logic, not display)
+                tenkan, kijun, senkou_a, senkou_b, chikou = calculate_ichimoku(df)
+                
+                # Calculate signal EMAs (13/30 - for signal detection)
+                ema_13 = calculate_ema(df, 13)
+                ema_30 = calculate_ema(df, 30)
+                
+                # Calculate display EMAs based on timeframe
+                if timeframe == 'Daily':
+                    ema_display_1 = calculate_ema(df, 50)
+                    ema_display_2 = calculate_ema(df, 200)
+                    ema_period_1 = 50
+                    ema_period_2 = 200
+                else:  # Weekly
+                    ema_display_1 = calculate_ema(df, 10)
+                    ema_display_2 = calculate_ema(df, 30)
+                    ema_period_1 = 10
+                    ema_period_2 = 30
+                
+                # Find Enhanced TR signals
+                buy_signals, sell_signals, signal_details = find_enhanced_tr_signals(
+                    df, tr_data, ema_13, ema_30, senkou_a, senkou_b
+                )
+                
+                # Create chart
+                fig = create_enhanced_tr_chart(
+                    df=df,
+                    ema_display_1=ema_display_1,
+                    ema_display_2=ema_display_2,
+                    ema_period_1=ema_period_1,
+                    ema_period_2=ema_period_2,
+                    buy_signals=buy_signals,
+                    sell_signals=sell_signals,
+                    signal_details=signal_details,
+                    timeframe=timeframe
+                )
+                
+                # Store signal details for table display
+                st.session_state['enhanced_tr_signals'] = signal_details
                 
             elif params.get('has_signals', False):
                 # RSI - has buy/sell signals
@@ -2460,6 +2935,44 @@ if update_button:
 # Display chart if it exists in session state
 if 'indicator_chart_fig' in st.session_state:
     st.plotly_chart(st.session_state['indicator_chart_fig'], use_container_width=True)
+    
+    # Display Enhanced TR Signal table if available
+    if 'indicator_chart_data' in st.session_state:
+        if st.session_state['indicator_chart_data'].get('indicator') == 'Enhanced TR Signal':
+            if 'enhanced_tr_signals' in st.session_state and st.session_state['enhanced_tr_signals']:
+                st.markdown("### 📋 Recent Signals (Last 20)")
+                
+                # Get last 20 signals
+                signals = st.session_state['enhanced_tr_signals'][-20:]
+                
+                if signals:
+                    # Create DataFrame for display - only Date, Signal, Price
+                    signal_df = pd.DataFrame(signals)
+                    signal_df = signal_df[['date', 'signal', 'price']]
+                    signal_df.columns = ['Date', 'Signal', 'Price']
+                    
+                    # Format price column
+                    signal_df['Price'] = signal_df['Price'].apply(lambda x: f"${x:.2f}")
+                    
+                    # Color code signals
+                    def highlight_signal(row):
+                        if row['Signal'] == 'BUY':
+                            return ['background-color: rgba(0, 200, 83, 0.3)'] * len(row)
+                        else:
+                            return ['background-color: rgba(255, 23, 68, 0.3)'] * len(row)
+                    
+                    styled_df = signal_df.style.apply(highlight_signal, axis=1)
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                    
+                    # Summary
+                    all_signals = st.session_state['enhanced_tr_signals']
+                    buy_count = len([s for s in all_signals if s['signal'] == 'BUY'])
+                    sell_count = len([s for s in all_signals if s['signal'] == 'SELL'])
+                    st.caption(f"Total signals in period: {len(all_signals)} (🟢 {buy_count} BUY, 🔴 {sell_count} SELL) | Showing last {len(signals)}")
+                else:
+                    st.info("No signals found in this period. This strategy is conservative and signals are rare.")
+            else:
+                st.info("ℹ️ No Enhanced TR signals found. This is a conservative strategy - signals are rare but high quality.")
 else:
     st.info("👆 Click 'Update' button to generate the indicator chart")
 
