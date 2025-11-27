@@ -389,7 +389,7 @@ AVAILABLE_COLUMNS = {
     
     # TR Indicator Fields (5)
     'tr_status': {'name': 'TR Status', 'width': 1.2, 'category': 'TR Indicator'},
-    'tr_value': {'name': 'TR Value', 'width': 0.8, 'category': 'TR Indicator'},
+    #'tr_value': {'name': 'TR Value', 'width': 0.8, 'category': 'TR Indicator'},
     'buy_point': {'name': 'Buy Point', 'width': 0.8, 'category': 'TR Indicator'},
     'stop_loss': {'name': 'Stop Loss', 'width': 0.8, 'category': 'TR Indicator'},
     'risk_percent': {'name': 'Risk %', 'width': 0.7, 'category': 'TR Indicator'},
@@ -435,13 +435,13 @@ AVAILABLE_COLUMNS = {
 # Built-in preset views
 PRESET_VIEWS = {
     'Quick View': ['symbol', 'price', 'price_change_pct', 'volume', 'tr_status'],
-    'TR Analysis': ['symbol', 'price', 'tr_status', 'tr_value', 'buy_point', 'stop_loss', 'risk_percent'],
+    'TR Analysis': ['symbol', 'price', 'tr_status', 'buy_point', 'stop_loss', 'risk_percent'],
     'TR Indicator Daily/Weekly Scan': ['symbol', 'tr_daily', 'tr_weekly', 'alignment'],
     'Technical': ['symbol', 'price', 'tr_status', 'rsi', 'macd', 'ema_20', 'ema_50', 'ema_200'],
     'Performance': ['symbol', 'price', 'price_change_pct', 'perf_1m', 'perf_3m', 'perf_6m', 'perf_1y'],
     'Fundamentals': ['symbol', 'price', 'market_cap', 'pe_ratio', 'beta', 'volume', 'avg_volume'],
     '52 Week': ['symbol', 'price', 'week_52_high', 'week_52_low', 'price_change_pct', 'tr_status'],
-    'Comprehensive': ['symbol', 'price', 'price_change_pct', 'tr_status', 'tr_value', 'rsi', 'macd', 
+    'Comprehensive': ['symbol', 'price', 'price_change_pct', 'tr_status', 'rsi', 'macd', 
                      'ema_20', 'ema_50', 'ema_200', 'perf_1m', 'perf_3m', 'perf_1y']
 }
 
