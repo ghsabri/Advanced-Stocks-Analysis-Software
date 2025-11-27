@@ -2271,6 +2271,54 @@ st.markdown("**Dual-panel chart showing indicator signals and price action**")
 st.markdown("---")
 
 # ============================================================================
+# SYNC FROM STOCKS ANALYSIS
+# ============================================================================
+
+synced_symbol = ""
+synced_indicator = ""
+synced_indicator_idx = 0
+synced_tf = "daily"
+synced_tf_idx = 0
+should_auto_analyze = False
+
+indicator_options = ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend", "TR / Ichimoku Combo Strategy"]
+
+if st.session_state.get('auto_sync_enabled', False) and st.session_state.get('sync_indicator_chart', False):
+    if st.session_state.get('synced_symbol', ''):
+        synced_symbol = st.session_state.get('synced_symbol', '')
+        synced_indicator = st.session_state.get('sync_indicator_type', 'RSI')
+        synced_tf = st.session_state.get('synced_timeframe', 'daily')
+        synced_tf_idx = 0 if synced_tf == 'daily' else 1
+        
+        # Get index for indicator dropdown
+        if synced_indicator in indicator_options:
+            synced_indicator_idx = indicator_options.index(synced_indicator)
+        
+        # Check if this is a NEW sync (symbol or indicator or timeframe changed)
+        last_synced = st.session_state.get('ic_last_synced', '')
+        current_sync_key = f"{synced_symbol}_{synced_indicator}_{synced_tf}"
+        
+        if current_sync_key != last_synced:
+            st.session_state['ic_last_synced'] = current_sync_key
+            should_auto_analyze = True
+
+# Determine defaults for inputs
+if synced_symbol:
+    default_symbol = synced_symbol
+    default_indicator_idx = synced_indicator_idx
+    default_tf_idx = synced_tf_idx
+elif 'ic_last_analyzed_symbol' in st.session_state:
+    default_symbol = st.session_state['ic_last_analyzed_symbol']
+    last_indicator = st.session_state.get('ic_last_analyzed_indicator', 'RSI')
+    default_indicator_idx = indicator_options.index(last_indicator) if last_indicator in indicator_options else 0
+    last_tf = st.session_state.get('ic_last_analyzed_timeframe', 'Daily')
+    default_tf_idx = 0 if last_tf == 'Daily' else 1
+else:
+    default_symbol = "GOOGL"
+    default_indicator_idx = 0
+    default_tf_idx = 0
+
+# ============================================================================
 # CONTROLS
 # ============================================================================
 
@@ -2279,14 +2327,15 @@ col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     indicator_choice = st.selectbox(
         "Indicator:",
-        ["RSI", "MACD", "EMA", "EMA Crossover", "Ichimoku Cloud", "SuperTrend", "TR / Ichimoku Combo Strategy"],
+        indicator_options,
+        index=default_indicator_idx,
         help="Select technical indicator to display"
     )
 
 with col2:
     symbol = st.text_input(
         "Symbol:",
-        value="GOOGL",
+        value=default_symbol,
         help="Enter stock ticker symbol"
     ).upper()
 
@@ -2297,6 +2346,10 @@ with col3:
         index=4,  # Default to 3 Years
         help="Select data duration"
     )
+
+# Show sync indicator if synced
+if synced_symbol:
+    st.caption(f"🔗 Synced from Stocks Analysis ({synced_symbol}, {synced_indicator}, {synced_tf.capitalize()})")
 
 # Duration mapping
 duration_map = {
@@ -2377,12 +2430,25 @@ with col4:
     timeframe = st.radio(
         "Chart Timeframe:",
         ["Daily", "Weekly"],
+        index=default_tf_idx,
         horizontal=True
     )
 
 with col5:
     st.markdown("<br>", unsafe_allow_html=True)
     update_button = st.button("🔄 Update", type="primary", use_container_width=True)
+
+# Auto-analyze if:
+# 1. New sync from Stocks Analysis, OR
+# 2. Returning to page with previously analyzed symbol/indicator/timeframe (re-run from cache)
+if should_auto_analyze and symbol:
+    update_button = True
+elif not update_button:
+    last_symbol = st.session_state.get('ic_last_analyzed_symbol', '')
+    last_indicator = st.session_state.get('ic_last_analyzed_indicator', '')
+    last_tf = st.session_state.get('ic_last_analyzed_timeframe', '')
+    if last_symbol and last_symbol.upper() == symbol.upper() and last_indicator == indicator_choice and last_tf == timeframe:
+        update_button = True
 
 st.markdown("---")
 
@@ -2901,6 +2967,11 @@ if update_button:
             }
             
             st.success(f"✅ Chart generated for {symbol} ({duration_choice}, {timeframe})")
+            
+            # Store what was analyzed (for re-display on return)
+            st.session_state['ic_last_analyzed_symbol'] = symbol
+            st.session_state['ic_last_analyzed_indicator'] = indicator_choice
+            st.session_state['ic_last_analyzed_timeframe'] = timeframe
             
         except Exception as e:
             st.error(f"❌ Error generating chart: {str(e)}")

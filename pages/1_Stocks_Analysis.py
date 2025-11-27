@@ -157,6 +157,121 @@ if not st.session_state.get('logged_in', False):
     st.warning("⚠️ Please login from the Home page to access this feature.")
     st.stop()
 
+# ============================================================
+# SIDEBAR - Settings
+# ============================================================
+with st.sidebar:
+    # Custom CSS to match sidebar navigation font size and style
+    st.markdown("""
+    <style>
+    /* Match checkbox labels to sidebar nav style */
+    [data-testid="stSidebar"] .stCheckbox label p {
+        font-size: 0.875rem !important;
+        font-weight: 400 !important;
+        line-height: 1.5 !important;
+    }
+    /* Match radio labels to sidebar nav style */
+    [data-testid="stSidebar"] .stRadio label p {
+        font-size: 0.875rem !important;
+        font-weight: 400 !important;
+    }
+    /* Match selectbox to sidebar nav style */
+    [data-testid="stSidebar"] .stSelectbox label p {
+        font-size: 0.875rem !important;
+        font-weight: 400 !important;
+    }
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        font-size: 0.875rem !important;
+    }
+    /* Settings header */
+    [data-testid="stSidebar"] .settings-header {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.25rem;
+    }
+    /* Reduce checkbox vertical spacing */
+    [data-testid="stSidebar"] .stCheckbox {
+        margin-bottom: -10px !important;
+    }
+    /* Reduce radio button spacing */
+    [data-testid="stSidebar"] .stRadio > div {
+        margin-top: -5px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create a container with border for all settings
+    settings_container = st.container(border=True)
+    
+    with settings_container:
+        st.markdown('<p class="settings-header">⚙️ Page Sync Settings</p>', unsafe_allow_html=True)
+        
+        # Master Auto-sync toggle
+        auto_sync = st.checkbox(
+            "Auto-Sync on",
+            value=st.session_state.get('auto_sync_enabled', True),
+            help="Enable/disable syncing to other pages"
+        )
+        st.session_state['auto_sync_enabled'] = auto_sync
+        
+        # Individual page checkboxes (only enabled when auto-sync is on)
+        sync_tr = st.checkbox(
+            "TR Indicator",
+            value=st.session_state.get('sync_tr_indicator', True),
+            disabled=not auto_sync
+        )
+        sync_seasonality = st.checkbox(
+            "Seasonality",
+            value=st.session_state.get('sync_seasonality', True),
+            disabled=not auto_sync
+        )
+        sync_daytrading = st.checkbox(
+            "Day Trading",
+            value=st.session_state.get('sync_daytrading', True),
+            disabled=not auto_sync
+        )
+        sync_indicator_chart = st.checkbox(
+            "Indicator Chart",
+            value=st.session_state.get('sync_indicator_chart', True),
+            disabled=not auto_sync
+        )
+        
+        # Indicator Chart dropdown - only show when both auto_sync and indicator_chart are on
+        if auto_sync and sync_indicator_chart:
+            indicator_options = [
+                "RSI",
+                "MACD",
+                "EMA",
+                "EMA Crossover",
+                "Ichimoku Cloud",
+                "SuperTrend",
+                "TR / Ichimoku Combo Strategy"
+            ]
+            selected_indicator = st.selectbox(
+                "Chart Type",
+                indicator_options,
+                index=indicator_options.index(st.session_state.get('sync_indicator_type', 'RSI')) if st.session_state.get('sync_indicator_type', 'RSI') in indicator_options else 0,
+                label_visibility="collapsed"
+            )
+            st.session_state['sync_indicator_type'] = selected_indicator
+        
+        # Save individual sync settings
+        st.session_state['sync_tr_indicator'] = sync_tr
+        st.session_state['sync_seasonality'] = sync_seasonality
+        st.session_state['sync_daytrading'] = sync_daytrading
+        st.session_state['sync_indicator_chart'] = sync_indicator_chart
+        
+        # Timeframe selector - horizontal, only enabled when auto-sync is on
+        selected_timeframe = st.radio(
+            "Timeframe",
+            ["Daily", "Weekly"],
+            index=0 if st.session_state.get('selected_timeframe', 'daily') == 'daily' else 1,
+            horizontal=True,
+            disabled=not auto_sync,
+            label_visibility="collapsed"
+        )
+        st.session_state['selected_timeframe'] = selected_timeframe.lower()
+
 # Page title
 st.title("📊 Stocks Analysis")
 st.markdown("**Complete Stock Analysis Dashboard**")
@@ -175,6 +290,11 @@ with col1:
         st.session_state['analysis_symbol'] = clicked_symbol
         st.session_state['current_input_symbol'] = clicked_symbol
         st.session_state['update_triggered'] = True
+        
+        # Auto-sync: Set synced variables for other pages
+        if st.session_state.get('auto_sync_enabled', True):
+            st.session_state['synced_symbol'] = clicked_symbol
+            st.session_state['synced_timeframe'] = st.session_state.get('selected_timeframe', 'daily')
     
     # Get the current input symbol (persists across reruns)
     current_symbol = st.session_state.get('current_input_symbol', '')
@@ -209,6 +329,11 @@ if update_button and symbol:
     st.session_state['analysis_symbol'] = symbol_clean
     st.session_state['current_input_symbol'] = symbol_clean
     st.session_state['update_triggered'] = True
+    
+    # Auto-sync: Set synced variables for other pages
+    if st.session_state.get('auto_sync_enabled', True):
+        st.session_state['synced_symbol'] = symbol_clean
+        st.session_state['synced_timeframe'] = st.session_state.get('selected_timeframe', 'daily')
 
 # Main analysis section
 if st.session_state.get('update_triggered', False):

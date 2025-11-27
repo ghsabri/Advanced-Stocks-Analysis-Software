@@ -45,11 +45,33 @@ st.markdown("""
 st.title("📈 Seasonality Analysis")
 st.markdown("**Analyze monthly performance patterns and seasonal trends**")
 
+# Check for sync from Stocks Analysis page
+synced_symbol = ""
+should_auto_analyze = False
+
+if st.session_state.get('auto_sync_enabled', False) and st.session_state.get('sync_seasonality', False):
+    if st.session_state.get('synced_symbol', ''):
+        synced_symbol = st.session_state.get('synced_symbol', '')
+        
+        # Check if this is a NEW sync (symbol changed)
+        last_synced = st.session_state.get('seas_last_synced', '')
+        if synced_symbol != last_synced:
+            st.session_state['seas_last_synced'] = synced_symbol
+            should_auto_analyze = True
+
+# Determine default symbol for input
+if synced_symbol:
+    default_symbol = synced_symbol
+elif 'seas_last_analyzed_symbol' in st.session_state:
+    default_symbol = st.session_state['seas_last_analyzed_symbol']
+else:
+    default_symbol = "AAPL"
+
 # Input section
 col1, col2 = st.columns([3, 3])
 
 with col1:
-    symbol = st.text_input("Stock Symbol", value="AAPL", help="Enter ticker symbol")
+    symbol = st.text_input("Stock Symbol", value=default_symbol, help="Enter ticker symbol")
 
 with col2:
     analysis_type = st.selectbox(
@@ -57,6 +79,10 @@ with col2:
         ["Absolute Performance", "Relative to S&P 500"],
         help="Absolute: Stock performance alone\nRelative: Stock vs SPY performance"
     )
+
+# Show sync indicator if synced
+if synced_symbol:
+    st.caption(f"🔗 Synced from Stocks Analysis ({synced_symbol})")
 
 # Get API source from session state
 api_source = st.session_state.get('api_source', 'Yahoo Finance')
@@ -215,7 +241,19 @@ def create_seasonality_chart(stats, ticker, years, chart_type='absolute'):
 
 
 # Analyze button
-if st.button("📊 Generate Seasonality Chart", type="primary", use_container_width=True):
+analyze_button = st.button("📊 Generate Seasonality Chart", type="primary", use_container_width=True)
+
+# Auto-analyze if:
+# 1. New sync from Stocks Analysis, OR
+# 2. Returning to page with previously analyzed symbol (re-run from cache)
+if should_auto_analyze and symbol:
+    analyze_button = True
+elif not analyze_button:
+    last_symbol = st.session_state.get('seas_last_analyzed_symbol', '')
+    if last_symbol and last_symbol.upper() == symbol.upper():
+        analyze_button = True
+
+if analyze_button:
     
     duration_days = st.session_state.get('seasonality_duration_days', 1825)
     duration_label = st.session_state.get('seasonality_duration_label', '5 Years')
@@ -279,6 +317,9 @@ if st.button("📊 Generate Seasonality Chart", type="primary", use_container_wi
             st.session_state['seasonality_type'] = chart_type
             
             st.success(f"✅ Seasonality analysis complete!")
+            
+            # Store what was analyzed (for re-display on return)
+            st.session_state['seas_last_analyzed_symbol'] = symbol
             
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")

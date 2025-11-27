@@ -72,25 +72,80 @@ with st.sidebar:
     duration_days = duration_map[duration_option]
 
 # Stock input section
+
+# Check for sync from Stocks Analysis page
+synced_symbol = ""
+synced_tf = "daily"
+synced_timeframe_idx = 0
+should_auto_analyze = False
+
+if st.session_state.get('auto_sync_enabled', False) and st.session_state.get('sync_tr_indicator', False):
+    if st.session_state.get('synced_symbol', ''):
+        synced_symbol = st.session_state.get('synced_symbol', '')
+        synced_tf = st.session_state.get('synced_timeframe', 'daily')
+        synced_timeframe_idx = 0 if synced_tf == 'daily' else 1
+        
+        # Check if this is a NEW sync (symbol changed)
+        last_synced = st.session_state.get('tr_last_synced', '')
+        current_sync_key = f"{synced_symbol}_{synced_tf}"
+        
+        if current_sync_key != last_synced:
+            st.session_state['tr_last_synced'] = current_sync_key
+            should_auto_analyze = True
+
+# Determine default symbol for input
+if synced_symbol:
+    default_symbol = synced_symbol
+elif 'tr_last_analyzed_symbol' in st.session_state:
+    default_symbol = st.session_state['tr_last_analyzed_symbol']
+else:
+    default_symbol = ""
+
 col1, col2, col3 = st.columns([2, 1, 1])
 
 with col1:
     symbol = st.text_input(
         "Enter Stock Symbol",
+        value=default_symbol,
         placeholder="e.g., AAPL, GOOGL, TSLA",
         help="Enter a valid stock ticker symbol"
     ).upper()
 
 with col2:
+    # Determine default timeframe
+    if synced_symbol:
+        tf_idx = synced_timeframe_idx
+    elif 'tr_last_analyzed_timeframe' in st.session_state:
+        tf_idx = 0 if st.session_state['tr_last_analyzed_timeframe'] == 'Daily' else 1
+    else:
+        tf_idx = 0
+    
     timeframe = st.selectbox(
         "Timeframe",
         ["Daily", "Weekly"],
+        index=tf_idx,
         help="Select chart timeframe"
     )
 
 with col3:
     st.markdown("<br>", unsafe_allow_html=True)
     analyze_button = st.button("🔍 Analyze Stock", type="primary", use_container_width=True)
+
+# Show sync indicator if synced
+if synced_symbol:
+    st.caption(f"🔗 Synced from Stocks Analysis ({synced_symbol}, {synced_tf.capitalize()})")
+
+# Auto-analyze if:
+# 1. New sync from Stocks Analysis, OR
+# 2. Returning to page with previously analyzed symbol (re-run from cache)
+if should_auto_analyze and symbol:
+    analyze_button = True
+elif not analyze_button:
+    # Check if returning with same symbol that was last analyzed
+    last_symbol = st.session_state.get('tr_last_analyzed_symbol', '')
+    last_tf = st.session_state.get('tr_last_analyzed_timeframe', '')
+    if last_symbol and last_symbol.upper() == symbol.upper() and last_tf == timeframe:
+        analyze_button = True
 
 st.markdown("---")
 
@@ -196,6 +251,10 @@ if analyze_button and symbol:
             
             # Display results
             st.success(f"✅ Analysis complete for {symbol}!")
+            
+            # Store what was analyzed (for re-display on return)
+            st.session_state['tr_last_analyzed_symbol'] = symbol
+            st.session_state['tr_last_analyzed_timeframe'] = timeframe
             
             # Current Status Card
             st.markdown("### 🎯 Current TR Status")
