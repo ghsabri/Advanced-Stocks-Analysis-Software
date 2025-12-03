@@ -1,0 +1,57 @@
+===============================================
+GOOGLE FORM #3: COMMENTARY FEEDBACK (OPTIONAL)
+Copy-Paste Template
+===============================================
+
+FORM SETTINGS:
+Title: Weekly Commentary Feedback
+Description: Quick 1-minute feedback on this week's commentary
+
+===============================================
+
+QUESTION 1:
+Type: Multiple Choice (Required)
+Question: Did you read this week's commentary?
+
+Options:
+○ Yes, all of it
+○ Skimmed it
+○ No
+
+===============================================
+
+QUESTION 2:
+Type: Linear Scale (Required)
+Question: How useful was the market overview?
+
+Scale: 1 to 5
+Label for 1: Not useful
+Label for 5: Very useful
+
+===============================================
+
+QUESTION 3:
+Type: Linear Scale (Required)
+Question: How useful were the stock picks?
+
+Scale: 1 to 5
+Label for 1: Not useful
+Label for 5: Very useful
+
+===============================================
+
+QUESTION 4:
+Type: Short Answer (Optional)
+Question: What would make the commentary better?
+
+===============================================
+
+QUESTION 5:
+Type: Short Answer (Optional)
+Question: Your email (optional):
+
+===============================================
+
+END OF FORM
+
+After creating, click SEND → Get link → Save as: COMMENTARY_FEEDBACK_LINK

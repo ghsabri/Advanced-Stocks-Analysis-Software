@@ -1,0 +1,88 @@
+===============================================
+GOOGLE FORM #1: WEEK 1 MID-WEEK SURVEY
+Copy-Paste Template
+===============================================
+
+FORM SETTINGS:
+Title: MJ Software Beta - Week 1 Check-In
+Description: Quick 2-minute feedback on your first few days with the platform
+
+===============================================
+
+QUESTION 1:
+Type: Multiple Choice (Required)
+Question: How many times have you logged in so far?
+
+Options:
+○ 0-1 times
+○ 2-3 times
+○ 4-5 times
+○ 6+ times
+
+===============================================
+
+QUESTION 2:
+Type: Checkboxes (Required)
+Question: Which features have you tried? (Check all that apply)
+
+Options:
+☐ Stock Analysis
+☐ TR Indicator
+☐ Daily Trading Guide
+☐ Watchlists
+☐ Pattern Detection
+☐ AI Confidence Scores
+
+===============================================
+
+QUESTION 3:
+Type: Short Answer (Required)
+Question: What's your favorite feature so far?
+
+===============================================
+
+QUESTION 4:
+Type: Short Answer (Required)
+Question: What's been most confusing or frustrating?
+
+===============================================
+
+QUESTION 5:
+Type: Multiple Choice (Required)
+Question: Any bugs encountered?
+
+Options:
+○ No bugs
+○ Yes (describe below)
+
+FOLLOW-UP (if "Yes" selected):
+Type: Paragraph
+Question: Please describe the bugs:
+
+===============================================
+
+QUESTION 6:
+Type: Linear Scale (Required)
+Question: On a scale of 1-5, how easy is the platform to use?
+
+Scale: 1 to 5
+Label for 1: Very difficult
+Label for 5: Very easy
+
+===============================================
+
+QUESTION 7:
+Type: Paragraph (Optional)
+Question: Any quick suggestions?
+
+===============================================
+
+QUESTION 8:
+Type: Short Answer (Required)
+Question: Your email (so we can follow up)
+
+===============================================
+
+END OF FORM
+
+After creating, click SEND → Get link → Save as: WEEK1_SURVEY_LINK

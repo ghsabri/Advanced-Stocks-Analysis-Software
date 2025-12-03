@@ -477,8 +477,13 @@ def initialize_session_state():
     if 'stock_tr_cache_weekly' not in st.session_state:
         st.session_state.stock_tr_cache_weekly = {}
     
-    # Load from database if available
-    if DATABASE_ENABLED:
+    # Flag to track if we've already loaded from database this session
+    # This prevents duplicate loading on every st.rerun()
+    if 'db_loaded' not in st.session_state:
+        st.session_state.db_loaded = False
+    
+    # Load from database ONLY ONCE per session
+    if DATABASE_ENABLED and not st.session_state.db_loaded:
         try:
             db_watchlists = db_get_all_watchlists()
             if db_watchlists:
@@ -538,19 +543,23 @@ def initialize_session_state():
                     except Exception as e:
                         print(f"  ⚠️ Error loading stocks for watchlist {watchlist_id}: {e}")
                         st.session_state.watchlists[watchlist_id]['stocks'] = []
+            
+            # Mark as loaded so we don't reload on every rerun
+            st.session_state.db_loaded = True
+            print("✅ Database loading complete - will not reload on reruns")
                         
         except Exception as e:
             print(f"❌ Error loading from database: {e}")
             traceback.print_exc()
+            # Still mark as loaded to prevent infinite retry loops
+            st.session_state.db_loaded = True
 
 
 def create_watchlist(name):
     """Create new watchlist"""
-    watchlist_id = f"watchlist_{st.session_state.watchlist_counter}"
-    st.session_state.watchlist_counter += 1
     
     watchlist_data = {
-        'id': st.session_state.watchlist_counter - 1,
+        'id': None,
         'name': name,
         'created_at': datetime.now(),
         'stocks': [],
@@ -559,15 +568,33 @@ def create_watchlist(name):
         'data_source': 'yahoo'
     }
     
+    # Try to create in database FIRST to get the real ID
     if DATABASE_ENABLED:
         try:
             db_id = db_create_watchlist(name)
             if db_id:
                 watchlist_data['id'] = db_id
                 watchlist_id = f"watchlist_{db_id}"
+                print(f"✅ Created watchlist in database with ID: {db_id}")
+            else:
+                # Database failed, use counter as fallback
+                watchlist_id = f"watchlist_{st.session_state.watchlist_counter}"
+                watchlist_data['id'] = st.session_state.watchlist_counter
+                st.session_state.watchlist_counter += 1
+                print(f"⚠️ Database returned no ID, using counter: {watchlist_id}")
         except Exception as e:
             print(f"Error creating in database: {e}")
+            # Fallback to counter
+            watchlist_id = f"watchlist_{st.session_state.watchlist_counter}"
+            watchlist_data['id'] = st.session_state.watchlist_counter
+            st.session_state.watchlist_counter += 1
+    else:
+        # No database, use counter
+        watchlist_id = f"watchlist_{st.session_state.watchlist_counter}"
+        watchlist_data['id'] = st.session_state.watchlist_counter
+        st.session_state.watchlist_counter += 1
     
+    # Add to session state with the final ID
     st.session_state.watchlists[watchlist_id] = watchlist_data
     st.session_state.active_watchlist = watchlist_id
     
@@ -1974,6 +2001,14 @@ def main():
             keys_to_delete = [k for k in st.session_state.keys() if k not in keys_to_keep]
             for key in keys_to_delete:
                 del st.session_state[key]
+            st.rerun()
+        
+        if st.button("🔄 Reload from Database", key="reload_db_btn"):
+            # Clear watchlists and db_loaded flag to force reload
+            st.session_state.watchlists = {}
+            st.session_state.active_watchlist = None
+            st.session_state.db_loaded = False
+            st.success("✅ Reloading watchlists from database...")
             st.rerun()
     
     show_watchlist_selector()

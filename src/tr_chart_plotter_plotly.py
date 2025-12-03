@@ -479,6 +479,21 @@ def plot_tr_indicator_chart_plotly(df, ticker, timeframe='Daily', figsize=(1400,
         }]
     ))
     
+    # Determine which button index corresponds to 1Y (default selection)
+    # Button order: 1M, 3M, 6M, 1Y, 3Y, 5Y, ALL
+    # Find the index of 1Y button
+    default_active_index = None
+    for idx, btn in enumerate(buttons):
+        if btn['label'] == '1Y':
+            default_active_index = idx
+            break
+    
+    # If 1Y button exists, set default view to 1 year
+    if default_active_index is not None and y_range_1y:
+        # Set initial x-axis and y-axis ranges to 1 year view
+        fig.update_xaxes(range=[max_date - timedelta(days=365), max_date])
+        fig.update_yaxes(range=y_range_1y)
+    
     # Add buttons to figure
     fig.update_layout(
         updatemenus=[
@@ -488,6 +503,7 @@ def plot_tr_indicator_chart_plotly(df, ticker, timeframe='Daily', figsize=(1400,
                 buttons=buttons,
                 pad={"r": 10, "t": 10},
                 showactive=True,
+                active=default_active_index if default_active_index is not None else -1,  # Highlight 1Y button
                 x=0.01,
                 xanchor="left",
                 y=1.15,
