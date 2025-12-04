@@ -1410,49 +1410,141 @@ def show_create_watchlist_form():
 
 
 def show_add_stock_form(watchlist_id):
-    """Display add stock form"""
+    """Display add stock form with CSV import option"""
     watchlist = st.session_state.watchlists.get(watchlist_id)
     if not watchlist:
         return
     
     st.subheader("➕ Add Stocks")
     
-    st.markdown("Enter stock symbol(s)")
-    col1, col2 = st.columns([4, 1])
+    # Two methods: Manual entry OR CSV import
+    add_method = st.radio(
+        "Add stocks by:",
+        ["Manual Entry", "Import from CSV"],
+        horizontal=True,
+        key=f"add_method_{watchlist_id}",
+        label_visibility="collapsed"
+    )
     
-    with col1:
-        stock_input = st.text_input(
-            "Enter stock symbol(s)",
-            placeholder="Single: AAPL  OR  Bulk: AAPL, MSFT, GOOGL, TSLA",
-            key=f"add_stock_input_{watchlist_id}",
-            help="Enter one symbol or multiple separated by commas",
-            label_visibility="collapsed"
+    if add_method == "Manual Entry":
+        # Original manual entry method
+        st.markdown("Enter stock symbol(s)")
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            stock_input = st.text_input(
+                "Enter stock symbol(s)",
+                placeholder="Single: AAPL  OR  Bulk: AAPL, MSFT, GOOGL, TSLA",
+                key=f"add_stock_input_{watchlist_id}",
+                help="Enter one symbol or multiple separated by commas",
+                label_visibility="collapsed"
+            )
+        
+        with col2:
+            add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}")
+        
+        if add_button and stock_input:
+            # Split by comma for bulk add
+            symbols = [s.strip().upper() for s in stock_input.split(',')]
+            
+            added_count = 0
+            duplicate_count = 0
+            
+            for symbol in symbols:
+                if symbol:
+                    if add_stock_to_watchlist(watchlist_id, symbol):
+                        added_count += 1
+                    else:
+                        duplicate_count += 1
+            
+            if added_count > 0:
+                st.success(f"✅ Added {added_count} stock(s) to watchlist!")
+            if duplicate_count > 0:
+                st.warning(f"⚠️ {duplicate_count} stock(s) already in watchlist")
+            
+            if added_count > 0:
+                st.rerun()
+    
+    else:
+        # CSV Import method
+        st.markdown("Upload a CSV file with stock symbols in the first column")
+        st.caption("First row can be a header (Symbol, Ticker, or Stock) - it will be automatically skipped")
+        
+        uploaded_file = st.file_uploader(
+            "Choose a CSV file",
+            type=['csv'],
+            key=f"csv_upload_{watchlist_id}",
+            help="CSV file with stock symbols in the first column"
         )
-    
-    with col2:
-        add_button = st.button("Add Stock(s)", key=f"add_stock_btn_{watchlist_id}")
-    
-    if add_button and stock_input:
-        # Split by comma for bulk add
-        symbols = [s.strip().upper() for s in stock_input.split(',')]
         
-        added_count = 0
-        duplicate_count = 0
-        
-        for symbol in symbols:
-            if symbol:
-                if add_stock_to_watchlist(watchlist_id, symbol):
-                    added_count += 1
+        if uploaded_file is not None:
+            try:
+                # Read CSV file
+                import io
+                csv_df = pd.read_csv(uploaded_file, header=None)
+                
+                if csv_df.empty:
+                    st.error("❌ The CSV file is empty")
                 else:
-                    duplicate_count += 1
-        
-        if added_count > 0:
-            st.success(f"✅ Added {added_count} stock(s) to watchlist!")
-        if duplicate_count > 0:
-            st.warning(f"⚠️ {duplicate_count} stock(s) already in watchlist")
-        
-        if added_count > 0:
-            st.rerun()
+                    # Get first column
+                    first_column = csv_df.iloc[:, 0].astype(str).str.strip().str.upper()
+                    
+                    # Check if first row is a header
+                    first_value = first_column.iloc[0] if len(first_column) > 0 else ""
+                    header_keywords = ['SYMBOL', 'TICKER', 'STOCK', 'SYMBOLS', 'TICKERS', 'STOCKS']
+                    
+                    if first_value in header_keywords:
+                        # Skip header row
+                        symbols = first_column.iloc[1:].tolist()
+                        st.info(f"📋 Detected header '{first_value}' - skipping first row")
+                    else:
+                        symbols = first_column.tolist()
+                    
+                    # Filter out empty values and clean symbols
+                    symbols = [s for s in symbols if s and s != 'NAN' and len(s) <= 10]
+                    
+                    if symbols:
+                        # Show preview
+                        st.markdown(f"**Found {len(symbols)} symbols:**")
+                        
+                        # Display in columns for better readability
+                        preview_text = ", ".join(symbols[:20])
+                        if len(symbols) > 20:
+                            preview_text += f"... and {len(symbols) - 20} more"
+                        st.code(preview_text)
+                        
+                        # Import button
+                        if st.button(f"📥 Import {len(symbols)} Stocks", key=f"import_csv_btn_{watchlist_id}", type="primary"):
+                            added_count = 0
+                            duplicate_count = 0
+                            
+                            progress_bar = st.progress(0)
+                            
+                            for idx, symbol in enumerate(symbols):
+                                progress_bar.progress((idx + 1) / len(symbols))
+                                
+                                if symbol and len(symbol) <= 10:  # Basic validation
+                                    if add_stock_to_watchlist(watchlist_id, symbol):
+                                        added_count += 1
+                                    else:
+                                        duplicate_count += 1
+                            
+                            progress_bar.empty()
+                            
+                            if added_count > 0:
+                                st.success(f"✅ Successfully imported {added_count} stock(s)!")
+                            if duplicate_count > 0:
+                                st.warning(f"⚠️ {duplicate_count} stock(s) were already in watchlist")
+                            
+                            if added_count > 0:
+                                st.rerun()
+                    else:
+                        st.warning("⚠️ No valid stock symbols found in the CSV file")
+                        
+            except Exception as e:
+                st.error(f"❌ Error reading CSV file: {str(e)}")
+                with st.expander("Show error details"):
+                    st.exception(e)
     
     st.divider()
 
