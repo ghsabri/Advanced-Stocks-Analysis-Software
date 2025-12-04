@@ -1371,13 +1371,14 @@ def show_watchlist_selector():
             with col1:
                 is_active = watchlist_id == st.session_state.active_watchlist
                 if st.button(
-                    f"{'📌 ' if is_active else ''}{watchlist['name']} ({len(watchlist['stocks'])})",
+                    f"{watchlist['name']} ({len(watchlist['stocks'])})",
                     key=f"select_{watchlist_id}",
                     type="primary" if is_active else "secondary",
                     use_container_width=True
                 ):
-                    st.session_state.active_watchlist = watchlist_id
-                    st.rerun()
+                    if watchlist_id != st.session_state.active_watchlist:
+                        st.session_state.active_watchlist = watchlist_id
+                        st.rerun()
             
             with col2:
                 if st.button("🗑️", key=f"delete_{watchlist_id}", help="Delete watchlist"):
@@ -1723,91 +1724,19 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     st.subheader(f"📊 Stocks in Watchlist ({len(watchlist['stocks'])})")
     
     # Use ~1.1 years for watchlist analysis (matches Stocks Analysis page)
-    # This ensures consistent caching and TR calculations
-    duration_days = 400  # Match Stocks Analysis page
+    duration_days = 400
     
     # Check if TR Indicator Daily/Weekly Scan view is selected
     is_multi_tf_view = selected_view == 'TR Indicator Daily/Weekly Scan'
     
-    # Create layout: Analyze button, Export, Bulk actions
-    analyze_col, export_col, bulk_col = st.columns([1, 1, 2])
+    # Edit mode state
+    edit_mode_key = f"edit_mode_{watchlist_id}"
+    if edit_mode_key not in st.session_state:
+        st.session_state[edit_mode_key] = False
     
-    with analyze_col:
-        # BATCH ANALYZE BUTTON - Always shows "Analyze All"
-        button_help = "Analyze ALL stocks on Daily + Weekly timeframes" if is_multi_tf_view else "Fetch and analyze ALL stocks with 1 year of data - optimized for speed!"
-        
-        if st.button("🚀 Analyze All", key=f"batch_analyze_{watchlist_id}", 
-                    type="primary", use_container_width=True,
-                    help=button_help):
-            
-            if is_multi_tf_view:
-                # TR Indicator Daily/Weekly Scan: Analyze both Daily and Weekly
-                with st.spinner(f"🔄 Multi-TF scanning {len(watchlist['stocks'])} stocks (Daily + Weekly)..."):
-                    stock_data = analyze_watchlist_multi_tf(
-                        watchlist_id,
-                        duration_days=duration_days
-                    )
-                    
-                    # Cache the results
-                    for stock in stock_data:
-                        cache_key = f"{stock['symbol']}_tr_data"
-                        st.session_state.stock_tr_cache[cache_key] = stock
-                    
-                    st.success(f"✅ TR Indicator Daily/Weekly Scan complete: {len(stock_data)} stocks!")
-                    st.rerun()
-            else:
-                # Regular single-timeframe analysis
-                with st.spinner(f"🚀 Batch fetching {len(watchlist['stocks'])} stocks..."):
-                    stock_data = analyze_watchlist_batch(
-                        watchlist_id,
-                        duration_days=duration_days,
-                        timeframe='daily'
-                    )
-                    
-                    # Cache the results
-                    for stock in stock_data:
-                        cache_key = f"{stock['symbol']}_tr_data"
-                        st.session_state.stock_tr_cache[cache_key] = stock
-                    
-                    st.success(f"✅ Analyzed {len(stock_data)} stocks!")
-                    st.rerun()
-    
-    with export_col:
-        # Export CSV functionality - moved here
-        pass  # Export button code is below with stock_data
-    
-    # Bulk delete functionality
-    bulk_delete_key = f"bulk_delete_{watchlist_id}"
-    if bulk_delete_key not in st.session_state:
-        st.session_state[bulk_delete_key] = set()
-    
-    with bulk_col:
-        if st.session_state[bulk_delete_key]:
-            selected_count = len(st.session_state[bulk_delete_key])
-            col_bulk1, col_bulk2 = st.columns(2)
-            
-            with col_bulk1:
-                st.markdown(f"**{selected_count} selected**")
-            
-            with col_bulk2:
-                if st.button(f"🗑️ Delete {selected_count} Stock(s)", 
-                           key=f"bulk_delete_btn_{watchlist_id}",
-                           type="secondary",
-                           use_container_width=True):
-                    for symbol in st.session_state[bulk_delete_key]:
-                        remove_stock_from_watchlist(watchlist_id, symbol)
-                    st.session_state[bulk_delete_key] = set()
-                    st.success(f"✅ Deleted {selected_count} stock(s)")
-                    st.rerun()
-    
-    # ========================================================================
-    # DISPLAY STOCKS
-    # ========================================================================
-    
-    # Get cached data
+    # Get cached stock data
     stock_data = []
     for stock in watchlist['stocks']:
-        # Handle both dict and string stock formats
         symbol = stock['symbol'] if isinstance(stock, dict) else stock
         symbol = str(symbol).upper().strip()
         
@@ -1815,195 +1744,240 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         if cache_key in st.session_state.stock_tr_cache:
             stock_data.append(st.session_state.stock_tr_cache[cache_key])
         else:
-            # Not analyzed yet
-            stock_data.append({
-                'symbol': symbol,
-                'price': None,
-                'tr_status': None
-            })
+            stock_data.append({'symbol': symbol, 'price': None, 'tr_status': None})
     
     # ========================================================================
-    # SORTING FUNCTIONALITY
+    # SORTING
     # ========================================================================
-    
-    # Initialize sort state for this watchlist
     sort_key = f"sort_{watchlist_id}"
     sort_dir_key = f"sort_dir_{watchlist_id}"
-    
     if sort_key not in st.session_state:
-        st.session_state[sort_key] = None  # No sorting by default
+        st.session_state[sort_key] = None
     if sort_dir_key not in st.session_state:
-        st.session_state[sort_dir_key] = 'desc'  # Default descending
+        st.session_state[sort_dir_key] = 'desc'
     
-    # Function to handle sort click
     def toggle_sort(column_id):
         if st.session_state[sort_key] == column_id:
-            # Toggle direction if same column
             st.session_state[sort_dir_key] = 'asc' if st.session_state[sort_dir_key] == 'desc' else 'desc'
         else:
-            # New column, default to descending
             st.session_state[sort_key] = column_id
             st.session_state[sort_dir_key] = 'desc'
     
-    # Sort stock_data if sort is active
     if st.session_state[sort_key] and stock_data:
         sort_col = st.session_state[sort_key]
         sort_reverse = st.session_state[sort_dir_key] == 'desc'
         
         def get_sort_value(stock):
             val = stock.get(sort_col, None)
-            # Handle None and 'N/A'
             if val is None or val == 'N/A' or val == '':
                 return float('-inf') if sort_reverse else float('inf')
-            # Handle numeric values
             if isinstance(val, (int, float)):
                 return val
-            # Handle strings that might be numbers
             if isinstance(val, str):
-                # Remove $ and % signs
-                clean_val = val.replace('$', '').replace('%', '').replace(',', '').strip()
                 try:
-                    return float(clean_val)
+                    return float(val.replace('$', '').replace('%', '').replace(',', '').strip())
                 except:
-                    return val.lower()  # Sort strings alphabetically
+                    return val.lower()
             return val
         
         try:
             stock_data = sorted(stock_data, key=get_sort_value, reverse=sort_reverse)
-        except Exception as e:
-            print(f"Sort error: {e}")
+        except:
+            pass
     
-    # Column headers with sort buttons
-    header_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.5])
+    # ========================================================================
+    # ACTION BUTTONS ROW
+    # ========================================================================
     
+    # Helper function to get currently selected symbols by reading checkbox states
+    def get_selected_symbols():
+        selected = []
+        for idx, stock in enumerate(stock_data):
+            symbol = stock.get('symbol', '')
+            checkbox_key = f"sel_{watchlist_id}_{symbol}"
+            if st.session_state.get(checkbox_key, False):
+                selected.append(symbol)
+        return selected
+    
+    # Get current selections
+    selected_symbols = get_selected_symbols()
+    selected_count = len(selected_symbols)
+    
+    # Single row with all action buttons - adjusted widths to prevent overlap
+    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5 = st.columns([1.5, 1, 0.8, 0.6, 0.8])
+    
+    with btn_col1:
+        button_help = "Analyze ALL stocks on Daily + Weekly timeframes" if is_multi_tf_view else "Analyze ALL stocks"
+        if st.button("🚀 Analyze All", key=f"batch_analyze_{watchlist_id}", 
+                    type="primary", use_container_width=True, help=button_help):
+            if is_multi_tf_view:
+                with st.spinner(f"🔄 Multi-TF scanning {len(watchlist['stocks'])} stocks..."):
+                    analysis_data = analyze_watchlist_multi_tf(watchlist_id, duration_days=duration_days)
+                    for s in analysis_data:
+                        st.session_state.stock_tr_cache[f"{s['symbol']}_tr_data"] = s
+                st.success(f"✅ Scan complete: {len(analysis_data)} stocks!")
+                st.rerun()
+            else:
+                with st.spinner(f"🚀 Analyzing {len(watchlist['stocks'])} stocks..."):
+                    analysis_data = analyze_watchlist_batch(watchlist_id, duration_days=duration_days, timeframe='daily')
+                    for s in analysis_data:
+                        st.session_state.stock_tr_cache[f"{s['symbol']}_tr_data"] = s
+                st.success(f"✅ Analyzed {len(analysis_data)} stocks!")
+                st.rerun()
+    
+    with btn_col2:
+        # Export CSV
+        if stock_data and any(s.get('tr_status') or s.get('price') for s in stock_data):
+            export_data = [{AVAILABLE_COLUMNS[c]['name']: re.sub(r'<[^>]+>', '', str(s.get(c, 'N/A'))).strip() 
+                          for c in columns_to_show} for s in stock_data]
+            csv = pd.DataFrame(export_data).to_csv(index=False)
+            st.download_button("📥 Export", data=csv, 
+                             file_name=f"{watchlist['name']}_{datetime.now().strftime('%Y%m%d')}.csv",
+                             mime="text/csv", key=f"export_{watchlist_id}")
+        else:
+            st.button("📥 Export", key=f"export_disabled_{watchlist_id}", disabled=True)
+    
+    with btn_col3:
+        if selected_count > 0:
+            st.markdown(f"**{selected_count} selected**")
+    
+    with btn_col4:
+        if selected_count == 1:
+            if st.button("✏️ Edit", key=f"edit_btn_{watchlist_id}", use_container_width=True):
+                st.session_state[edit_mode_key] = True
+                # No rerun needed - dialog will show on next natural rerun
+        else:
+            st.button("✏️ Edit", key=f"edit_disabled_{watchlist_id}", disabled=True, use_container_width=True)
+    
+    with btn_col5:
+        if selected_count > 0:
+            if st.button(f"🗑️ ({selected_count})", key=f"delete_btn_{watchlist_id}", use_container_width=True, help=f"Delete {selected_count} selected stock(s)"):
+                for sym in selected_symbols:
+                    remove_stock_from_watchlist(watchlist_id, sym)
+                    # Clear the checkbox state
+                    checkbox_key = f"sel_{watchlist_id}_{sym}"
+                    if checkbox_key in st.session_state:
+                        del st.session_state[checkbox_key]
+                st.success(f"✅ Deleted {selected_count} stock(s)")
+                st.rerun()
+        else:
+            st.button("🗑️", key=f"delete_disabled_{watchlist_id}", disabled=True, use_container_width=True, help="Select stocks to delete")
+    
+    # Edit dialog
+    if st.session_state[edit_mode_key] and selected_count == 1:
+        old_symbol = selected_symbols[0]
+        st.markdown("---")
+        edit_c1, edit_c2, edit_c3 = st.columns([2, 1, 1])
+        with edit_c1:
+            new_symbol = st.text_input("New Symbol", value=old_symbol, key=f"edit_input_{watchlist_id}").upper().strip()
+        with edit_c2:
+            if st.button("💾 Save", key=f"save_edit_{watchlist_id}", type="primary"):
+                if new_symbol and new_symbol != old_symbol:
+                    existing = [s['symbol'] if isinstance(s, dict) else s for s in watchlist['stocks']]
+                    if new_symbol in existing:
+                        st.error(f"❌ {new_symbol} already exists")
+                    else:
+                        remove_stock_from_watchlist(watchlist_id, old_symbol)
+                        add_stock_to_watchlist(watchlist_id, new_symbol)
+                        st.session_state[edit_mode_key] = False
+                        # Clear old checkbox state
+                        old_chk_key = f"sel_{watchlist_id}_{old_symbol}"
+                        if old_chk_key in st.session_state:
+                            del st.session_state[old_chk_key]
+                        if f"{old_symbol}_tr_data" in st.session_state.stock_tr_cache:
+                            del st.session_state.stock_tr_cache[f"{old_symbol}_tr_data"]
+                        st.success(f"✅ Changed {old_symbol} → {new_symbol}")
+                        st.rerun()
+        with edit_c3:
+            if st.button("❌ Cancel", key=f"cancel_edit_{watchlist_id}"):
+                st.session_state[edit_mode_key] = False
+                # No rerun needed
+        st.markdown("---")
+    
+    # ========================================================================
+    # COLUMN HEADERS
+    # ========================================================================
+    header_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show])
+    
+    # Select All checkbox
     with header_cols[0]:
-        st.markdown("**☑**")
+        all_symbols = [stock.get('symbol', '') for stock in stock_data]
+        select_all_key = f"select_all_{watchlist_id}"
+        
+        # Check if all are currently selected
+        all_selected = len(all_symbols) > 0 and all(
+            st.session_state.get(f"sel_{watchlist_id}_{sym}", False) for sym in all_symbols
+        )
+        
+        # Select All checkbox
+        if st.checkbox("All", value=all_selected, key=select_all_key, 
+                      help="Select/Deselect all stocks", label_visibility="collapsed"):
+            # Select all
+            for sym in all_symbols:
+                st.session_state[f"sel_{watchlist_id}_{sym}"] = True
+            if not all_selected:  # Only rerun if state changed
+                st.rerun()
+        else:
+            # Deselect all (only if previously all were selected)
+            if all_selected:
+                for sym in all_symbols:
+                    st.session_state[f"sel_{watchlist_id}_{sym}"] = False
+                st.rerun()
     
     for idx, col_id in enumerate(columns_to_show):
         with header_cols[idx + 1]:
             col_name = AVAILABLE_COLUMNS[col_id]['name']
-            
-            # Show sort indicator if this column is sorted
             if st.session_state[sort_key] == col_id:
                 sort_icon = "🔽" if st.session_state[sort_dir_key] == 'desc' else "🔼"
                 btn_label = f"{col_name} {sort_icon}"
             else:
                 btn_label = col_name
-            
-            # Clickable header for sorting
             if st.button(btn_label, key=f"sort_{watchlist_id}_{col_id}", 
-                        help=f"Click to sort by {col_name}",
-                        use_container_width=True):
+                        help=f"Sort by {col_name}", use_container_width=True):
                 toggle_sort(col_id)
                 st.rerun()
     
-    with header_cols[-1]:
-        st.markdown("**Action**")
-    
-    # Show bulk delete controls if stocks are selected
-    if st.session_state[bulk_delete_key]:
-        selected_count = len(st.session_state[bulk_delete_key])
-        if selected_count > 0:
-            st.caption(f"📌 {selected_count} stock(s) selected")
-    
     st.markdown("---")
     
-    # Create CSV Export button
-    with export_col:
-        if stock_data and any(s.get('tr_status') != None or s.get('price') != None for s in stock_data):
-            # Prepare CSV data
-            export_data = []
-            for stock in stock_data:
-                row = {}
-                for col_id in columns_to_show:
-                    value = stock.get(col_id, 'N/A')
-                    
-                    # Clean HTML formatting for CSV
-                    if isinstance(value, str):
-                        # re now imported at top
-                        value = re.sub(r'<[^>]+>', '', value)
-                        value = value.strip()
-                    
-                    row[AVAILABLE_COLUMNS[col_id]['name']] = value
-                export_data.append(row)
-            
-            # Create DataFrame and CSV
-            df = pd.DataFrame(export_data)
-            csv = df.to_csv(index=False)
-            
-            # Generate filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{watchlist['name'].replace(' ', '_')}_{timestamp}.csv"
-            
-            # Download button
-            st.download_button(
-                label="📥 Export CSV",
-                data=csv,
-                file_name=filename,
-                mime="text/csv",
-                key=f"download_csv_{watchlist_id}",
-                help=f"Download {len(stock_data)} stocks to CSV"
-            )
-        else:
-            st.button("📥 Export CSV", key=f"export_disabled_{watchlist_id}", 
-                     disabled=True, help="Click 'Analyze All' first")
-    
-    # Display stocks
+    # ========================================================================
+    # STOCK LIST
+    # ========================================================================
     for idx, stock in enumerate(stock_data):
-        data_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show] + [0.5])
+        data_cols = st.columns([0.4] + [AVAILABLE_COLUMNS[col]['width'] for col in columns_to_show])
         
-        # Checkbox column
+        symbol = stock.get('symbol', '')
+        checkbox_key = f"sel_{watchlist_id}_{symbol}"
+        
+        # Checkbox - use symbol-based key (not index-based) for stability
         with data_cols[0]:
-            symbol = stock.get('symbol', '')
-            is_checked = symbol in st.session_state[bulk_delete_key]
-            if st.checkbox("Select", value=is_checked, key=f"check_{watchlist_id}_{idx}_{symbol}", 
-                          label_visibility="collapsed"):
-                st.session_state[bulk_delete_key].add(symbol)
-            else:
-                st.session_state[bulk_delete_key].discard(symbol)
+            st.checkbox("", key=checkbox_key, label_visibility="collapsed")
         
+        # Data columns
         for col_idx, col_id in enumerate(columns_to_show):
             with data_cols[col_idx + 1]:
-                # Special handling for symbol - clickable link to Stocks Analysis
                 if col_id == 'symbol':
-                    symbol = stock.get('symbol', 'N/A')
-                    # Create a unique key for this symbol link
-                    link_key = f"link_{watchlist_id}_{idx}_{symbol}"
-                    
-                    # Use markdown link styling (clickable, no box)
-                    if st.button(f"**{symbol}**", key=link_key, 
-                                help=f"Analyze {symbol}",
-                                type="tertiary"):
-                        # Set selected_symbol - this triggers auto-update in Stocks Analysis page
+                    if st.button(f"**{symbol}**", key=f"sym_{watchlist_id}_{idx}_{symbol}", 
+                                help=f"Analyze {symbol}", type="secondary"):
                         st.session_state.selected_symbol = symbol
-                        
-                        # Only pass TR Status if:
-                        # 1. TR Status column is visible in current view
-                        # 2. Stock has been analyzed and has a valid TR Status
                         if 'tr_status' in columns_to_show:
-                            tr_status = stock.get('tr_status', None)
-                            if tr_status and tr_status != 'N/A' and tr_status is not None:
-                                st.session_state.passed_tr_status = tr_status
-                        
-                        st.switch_page("pages/1_Stocks_Analysis.py")
+                            tr = stock.get('tr_status')
+                            if tr and tr != 'N/A':
+                                st.session_state.passed_tr_status = tr
+                        # Use compatible page navigation
+                        try:
+                            st.switch_page("pages/1_Stocks_Analysis.py")
+                        except AttributeError:
+                            # Fallback for older Streamlit versions
+                            st.info(f"✅ Selected {symbol}. Please click 'Stocks Analysis' in the sidebar.")
                 else:
                     formatted_value = format_column_value(stock, col_id)
-                    # Fields that use HTML for coloring
                     if col_id in ['price_change_pct', 'tr_status', 'tr_daily', 'tr_weekly', 'alignment',
-                                  'perf_1m', 'perf_3m', 'perf_6m', 
-                                  'perf_ytd', 'perf_1y', 'perf_3y', 'perf_5y']:
+                                  'perf_1m', 'perf_3m', 'perf_6m', 'perf_ytd', 'perf_1y', 'perf_3y', 'perf_5y']:
                         st.markdown(formatted_value, unsafe_allow_html=True)
                     else:
                         st.write(formatted_value)
         
-        with data_cols[-1]:
-            if st.button("❌", key=f"remove_{watchlist_id}_{idx}_{stock['symbol']}"):
-                remove_stock_from_watchlist(watchlist_id, stock['symbol'])
-                st.rerun()
-        
-        # No divider - just a thin line with zero margin
-        st.markdown("<div style='height: 1px; background: #e0e0e0; margin: 0; padding: 0;'></div>", 
-                   unsafe_allow_html=True)
+        st.markdown("<div style='height: 1px; background: #e0e0e0; margin: 0;'></div>", unsafe_allow_html=True)
     
     # Summary statistics
     if 'tr_status' in columns_to_show:
