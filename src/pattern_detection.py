@@ -47,7 +47,7 @@ class PatternDetector:
         self.troughs = troughs
     
     def detect_all_patterns(self):
-        """Detect all 8 patterns and return list"""
+        """Detect all 11 patterns and return list"""
         patterns = []
         
         patterns.extend(self.detect_head_and_shoulders())
@@ -58,6 +58,10 @@ class PatternDetector:
         patterns.extend(self.detect_descending_triangle())
         patterns.extend(self.detect_symmetrical_triangle())
         patterns.extend(self.detect_cup_and_handle())
+        # New patterns
+        patterns.extend(self.detect_flat_base())
+        patterns.extend(self.detect_saucer_base())
+        patterns.extend(self.detect_ascending_base())
         
         patterns.sort(key=lambda x: x['start_date'])
         return patterns
@@ -407,6 +411,195 @@ class PatternDetector:
                     (self.dates[start + cup_low_idx], cup_low),
                     (self.dates[start + recovery_idx], window[recovery_idx])
                 ]
+            })
+        
+        return patterns
+
+    def detect_flat_base(self):
+        """
+        Flat Base - Bullish continuation
+        Characteristics:
+        - Tight price range (10-15% depth)
+        - 5+ weeks minimum duration
+        - Often forms after prior uptrend
+        """
+        patterns = []
+        window_size = 25  # ~5 weeks of daily data
+        max_depth = 0.15  # 15% max depth
+        min_depth = 0.03  # 3% min depth (must have some consolidation)
+        
+        for start in range(0, len(self.prices) - window_size, 5):
+            window = self.prices[start:start + window_size]
+            
+            # Calculate depth
+            high = np.max(window)
+            low = np.min(window)
+            depth = (high - low) / high
+            
+            # Check if flat (tight range)
+            if not (min_depth <= depth <= max_depth):
+                continue
+            
+            # Check for prior uptrend (price at start should be elevated)
+            if start >= 20:
+                prior_price = self.prices[start - 20]
+                if window[0] < prior_price * 1.1:  # Should be at least 10% above prior
+                    continue
+            
+            # Calculate resistance (top of range)
+            resistance = high
+            target = resistance * 1.10  # 10% above resistance
+            confidence = min(75, int(55 + (1 - depth/max_depth) * 20))
+            
+            patterns.append({
+                'type': 'Flat Base',
+                'direction': 'bullish',
+                'confidence': confidence,
+                'start_date': self.dates[start],
+                'end_date': self.dates[start + window_size - 1],
+                'start_idx': start,
+                'end_idx': start + window_size - 1,
+                'resistance': resistance,
+                'support': low,
+                'depth_pct': depth * 100,
+                'target_price': target,
+                'key_points': [
+                    (self.dates[start], window[0]),
+                    (self.dates[start + window_size//2], low),
+                    (self.dates[start + window_size - 1], window[-1])
+                ]
+            })
+        
+        return patterns
+
+    def detect_saucer_base(self):
+        """
+        Saucer Base - Bullish (shallow U-shape)
+        Characteristics:
+        - Wide, shallow U-shape (usually <20% depth)
+        - 7-65+ weeks duration
+        - Gradual rounding bottom
+        """
+        patterns = []
+        window_size = 50  # ~10 weeks minimum
+        max_depth = 0.25  # Usually <20%, allow up to 25%
+        
+        for start in range(0, len(self.prices) - window_size, 10):
+            window = self.prices[start:start + window_size]
+            
+            # Find the low point
+            low_idx = np.argmin(window)
+            low = window[low_idx]
+            
+            # Low should be in middle portion (not at edges)
+            if low_idx < window_size * 0.2 or low_idx > window_size * 0.8:
+                continue
+            
+            # Check depth
+            left_high = np.max(window[:low_idx])
+            right_high = np.max(window[low_idx:])
+            depth = (max(left_high, right_high) - low) / max(left_high, right_high)
+            
+            if depth > max_depth or depth < 0.05:
+                continue
+            
+            # Check for gradual slope (saucer shape)
+            # Left side should gradually decline
+            left_slope = (window[low_idx] - window[0]) / (low_idx + 1)
+            # Right side should gradually rise
+            right_slope = (window[-1] - window[low_idx]) / (window_size - low_idx)
+            
+            # Both slopes should be gradual (not steep)
+            if abs(left_slope) > 0.02 * window[0] or abs(right_slope) > 0.02 * window[-1]:
+                continue
+            
+            resistance = max(left_high, right_high)
+            target = resistance * 1.15
+            confidence = min(70, int(50 + (1 - depth/max_depth) * 20))
+            
+            patterns.append({
+                'type': 'Saucer Base',
+                'direction': 'bullish',
+                'confidence': confidence,
+                'start_date': self.dates[start],
+                'end_date': self.dates[start + window_size - 1],
+                'start_idx': start,
+                'end_idx': start + window_size - 1,
+                'resistance': resistance,
+                'support': low,
+                'depth_pct': depth * 100,
+                'target_price': target,
+                'key_points': [
+                    (self.dates[start], window[0]),
+                    (self.dates[start + low_idx], low),
+                    (self.dates[start + window_size - 1], window[-1])
+                ]
+            })
+        
+        return patterns
+
+    def detect_ascending_base(self):
+        """
+        Ascending Base - Bullish (stair-step pattern)
+        Characteristics:
+        - Series of higher lows (3+ pullbacks)
+        - Each pullback 10-20%
+        - 9-16 weeks duration
+        - Best if pullbacks get shallower
+        """
+        patterns = []
+        window_size = 60  # ~12 weeks
+        
+        for start in range(0, len(self.prices) - window_size, 10):
+            window = self.prices[start:start + window_size]
+            
+            # Find local troughs in window
+            local_troughs = []
+            for i in range(5, len(window) - 5, 5):
+                chunk = window[max(0, i-5):min(len(window), i+6)]
+                if window[i] == np.min(chunk):
+                    local_troughs.append((i, window[i]))
+            
+            # Need at least 3 pullbacks
+            if len(local_troughs) < 3:
+                continue
+            
+            # Check if troughs are ascending (higher lows)
+            trough_prices = [t[1] for t in local_troughs]
+            ascending = all(trough_prices[i] < trough_prices[i+1] for i in range(len(trough_prices)-1))
+            
+            if not ascending:
+                continue
+            
+            # Check pullback depths (should be 10-20% each)
+            valid_pullbacks = True
+            for i, (idx, price) in enumerate(local_troughs):
+                # Find high before this trough
+                high_before = np.max(window[:idx]) if idx > 0 else window[0]
+                pullback = (high_before - price) / high_before
+                if pullback < 0.05 or pullback > 0.25:
+                    valid_pullbacks = False
+                    break
+            
+            if not valid_pullbacks:
+                continue
+            
+            resistance = np.max(window)
+            target = resistance * 1.20
+            confidence = min(75, int(55 + len(local_troughs) * 5))
+            
+            patterns.append({
+                'type': 'Ascending Base',
+                'direction': 'bullish',
+                'confidence': confidence,
+                'start_date': self.dates[start],
+                'end_date': self.dates[start + window_size - 1],
+                'start_idx': start,
+                'end_idx': start + window_size - 1,
+                'resistance': resistance,
+                'num_pullbacks': len(local_troughs),
+                'target_price': target,
+                'key_points': [(self.dates[start + idx], price) for idx, price in local_troughs]
             })
         
         return patterns

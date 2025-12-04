@@ -8,9 +8,10 @@ import sys
 import os
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from pattern_detection import detect_patterns_for_chart
 from tr_enhanced import analyze_stock_complete_tr
@@ -230,14 +231,17 @@ if 'patterns' in st.session_state and st.session_state['patterns']:
             line_color = 'green'
             fill_color = 'rgba(0, 255, 0, 0.1)'
             border_color = 'green'
+            curve_color = 'blue'  # Contrasting color for curve
         elif pattern['direction'] == 'bearish':
             line_color = 'red'
             fill_color = 'rgba(255, 0, 0, 0.1)'
             border_color = 'red'
+            curve_color = 'darkmagenta'  # Contrasting color for curve
         else:
             line_color = 'orange'
             fill_color = 'rgba(255, 165, 0, 0.1)'
             border_color = 'orange'
+            curve_color = 'brown'  # Contrasting color for curve
         
         # Add colored price line for this pattern
         fig.add_trace(go.Scatter(
@@ -249,21 +253,238 @@ if 'patterns' in st.session_state and st.session_state['patterns']:
             hovertemplate=f"<b>{pattern['type']}</b><br>%{{y:.2f}}<extra></extra>"
         ))
         
+        # ============================================================
+        # ADD SMOOTH CURVE FOR THIS PATTERN
+        # ============================================================
+        key_points = pattern.get('key_points', [])
+        pattern_type = pattern['type']
+        
+        if len(key_points) >= 3 and pattern_type in ['Cup & Handle', 'Double Bottom', 'Double Top', 'Head & Shoulders', 'Inverse Head & Shoulders']:
+            try:
+                # Extract prices from key_points (each is (date, price) tuple)
+                kp_prices = [kp[1] for kp in key_points]
+                
+                # Generate smooth curve points based on pattern type
+                num_curve_points = 30
+                
+                if pattern_type == 'Cup & Handle':
+                    # U-shape curve WITH HANDLE
+                    # Cup takes 85% of the pattern, handle takes 15%
+                    cup_points = int(num_curve_points * 0.85)
+                    handle_points = num_curve_points - cup_points
+                    
+                    left_p, bottom_p, right_p = kp_prices[0], kp_prices[1], kp_prices[2]
+                    
+                    # Cup portion (U-shape)
+                    t_cup = np.linspace(0, 1, cup_points)
+                    cup_y = left_p * (1-t_cup)**2 + 2 * bottom_p * (1-t_cup) * t_cup + right_p * t_cup**2
+                    # Adjust to make it more U-shaped (deeper in middle)
+                    mid_adjustment = -abs(left_p - bottom_p) * 0.3 * np.sin(np.pi * t_cup)
+                    cup_y = cup_y + mid_adjustment
+                    
+                    # Handle portion (downward drift only - no recovery)
+                    handle_top = right_p
+                    handle_bottom = right_p * 0.93  # 7% pullback for handle
+                    t_handle = np.linspace(0, 1, handle_points)
+                    # Downward slope only
+                    handle_y = handle_top - (handle_top - handle_bottom) * t_handle
+                    
+                    # Combine cup and handle
+                    curve_y = np.concatenate([cup_y, handle_y])
+                    num_curve_points = len(curve_y)  # Update for combined length
+                
+                elif pattern_type == 'Double Bottom':
+                    # W-shape curve
+                    t = np.linspace(0, 1, num_curve_points)
+                    trough1, peak, trough2 = kp_prices[0], kp_prices[1], kp_prices[2]
+                    # Two parabolas joined
+                    curve_y = np.where(t < 0.5,
+                        trough1 + (peak - trough1) * (2*t)**2,  # First V
+                        peak - (peak - trough2) * (2*(t-0.5))**2)  # Second V (inverted approach)
+                    # Smooth W shape using sine
+                    curve_y = peak - (peak - min(trough1, trough2)) * np.abs(np.sin(2 * np.pi * t))
+                
+                elif pattern_type == 'Double Top':
+                    # M-shape curve (inverted W)
+                    t = np.linspace(0, 1, num_curve_points)
+                    peak1, trough, peak2 = kp_prices[0], kp_prices[1], kp_prices[2]
+                    # M shape using sine
+                    curve_y = trough + (max(peak1, peak2) - trough) * np.abs(np.sin(2 * np.pi * t))
+                
+                elif pattern_type in ['Head & Shoulders', 'Inverse Head & Shoulders']:
+                    # 3-peak or 3-trough shape
+                    t = np.linspace(0, 1, num_curve_points)
+                    left_p, head_p, right_p = kp_prices[0], kp_prices[1], kp_prices[2]
+                    neckline = (left_p + right_p) / 2
+                    
+                    if pattern_type == 'Head & Shoulders':
+                        # Peaks up from neckline
+                        curve_y = neckline + np.abs(np.sin(3 * np.pi * t)) * (head_p - neckline)
+                        # Make middle peak higher
+                        middle_boost = np.exp(-((t - 0.5) ** 2) / 0.05) * (head_p - left_p) * 0.5
+                        curve_y = curve_y + middle_boost
+                    else:
+                        # Troughs down from neckline
+                        curve_y = neckline - np.abs(np.sin(3 * np.pi * t)) * (neckline - head_p)
+                        # Make middle trough deeper
+                        middle_dip = np.exp(-((t - 0.5) ** 2) / 0.05) * (left_p - head_p) * 0.5
+                        curve_y = curve_y - middle_dip
+                
+                # Generate x coordinates (dates)
+                curve_indices = np.linspace(start_idx, end_idx, num_curve_points).astype(int)
+                curve_indices = np.clip(curve_indices, 0, len(df) - 1)
+                curve_dates = df['Date'].iloc[curve_indices].values
+                
+                # Add the smooth curve trace
+                fig.add_trace(go.Scatter(
+                    x=curve_dates,
+                    y=curve_y,
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dot'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+            except Exception as e:
+                print(f"  Curve error for {pattern_type}: {e}")
+        
+        # Add trendlines for Triangle patterns
+        elif 'Triangle' in pattern_type:
+            try:
+                # Get high and low points for trendlines
+                section_high = section_prices.max()
+                section_low = section_prices.min()
+                
+                # Find highs and lows at start and end of pattern
+                first_third = section_prices.iloc[:len(section_prices)//3]
+                last_third = section_prices.iloc[-len(section_prices)//3:]
+                
+                high_start = first_third.max()
+                high_end = last_third.max()
+                low_start = first_third.min()
+                low_end = last_third.min()
+                
+                start_date = section_dates.iloc[0]
+                end_date = section_dates.iloc[-1]
+                
+                # Upper trendline
+                fig.add_trace(go.Scatter(
+                    x=[start_date, end_date],
+                    y=[high_start, high_end],
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+                # Lower trendline
+                fig.add_trace(go.Scatter(
+                    x=[start_date, end_date],
+                    y=[low_start, low_end],
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+            except Exception as e:
+                print(f"  Trendline error for {pattern_type}: {e}")
+        
+        # Add horizontal lines for Flat Base only
+        elif pattern_type == 'Flat Base':
+            try:
+                start_date = section_dates.iloc[0]
+                end_date = section_dates.iloc[-1]
+                
+                # Get resistance and support from pattern data
+                resistance = pattern.get('resistance', section_prices.max())
+                support = pattern.get('support', section_prices.min())
+                
+                # Top horizontal line (resistance)
+                fig.add_trace(go.Scatter(
+                    x=[start_date, end_date],
+                    y=[resistance, resistance],
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+                # Bottom horizontal line (support)
+                fig.add_trace(go.Scatter(
+                    x=[start_date, end_date],
+                    y=[support, support],
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+            except Exception as e:
+                print(f"  Flat Base lines error: {e}")
+        
+        # Add curves for Saucer Base and Ascending Base
+        elif pattern_type in ['Saucer Base', 'Ascending Base']:
+            try:
+                key_points = pattern.get('key_points', [])
+                num_curve_points = 30
+                
+                if pattern_type == 'Saucer Base' and len(key_points) >= 3:
+                    # Shallow U-shape curve
+                    kp_prices = [kp[1] for kp in key_points]
+                    t = np.linspace(0, 1, num_curve_points)
+                    left_p, bottom_p, right_p = kp_prices[0], kp_prices[1], kp_prices[2]
+                    # Cosine curve for gentle saucer shape
+                    curve_y = bottom_p + (max(left_p, right_p) - bottom_p) * (1 - np.cos(np.pi * t)) / 2
+                    
+                elif pattern_type == 'Ascending Base' and len(key_points) >= 3:
+                    # Stair-step pattern with higher lows
+                    kp_prices = [kp[1] for kp in key_points]
+                    t = np.linspace(0, 1, num_curve_points)
+                    min_p = min(kp_prices)
+                    max_p = max(kp_prices)
+                    num_steps = len(kp_prices)
+                    # Rising line with pullback waves
+                    curve_y = min_p + (max_p - min_p) * t
+                    pullback_wave = -0.1 * (max_p - min_p) * np.abs(np.sin(num_steps * np.pi * t))
+                    curve_y = curve_y + pullback_wave
+                else:
+                    continue
+                
+                # Generate x coordinates (dates)
+                curve_indices = np.linspace(start_idx, end_idx, num_curve_points).astype(int)
+                curve_indices = np.clip(curve_indices, 0, len(df) - 1)
+                curve_dates = df['Date'].iloc[curve_indices].values
+                
+                # Add the curve
+                fig.add_trace(go.Scatter(
+                    x=curve_dates,
+                    y=curve_y,
+                    mode='lines',
+                    line=dict(color=curve_color, width=2, dash='dot'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
+            except Exception as e:
+                print(f"  {pattern_type} curve error: {e}")
+        
         # Get price range for rectangle
         y_min = section_prices.min() * 0.98
         y_max = section_prices.max() * 1.02
         
-        # Add rectangle background
-        fig.add_shape(
-            type="rect",
-            x0=section_dates.iloc[0],
-            x1=section_dates.iloc[-1],
-            y0=y_min,
-            y1=y_max,
-            fillcolor=fill_color,
-            line=dict(color=border_color, width=2, dash='dash'),
-            layer='below'
-        )
+        # Rectangle background - HIDDEN (patterns now use curves/lines instead)
+        # To re-enable: uncomment the code below
+        # fig.add_shape(
+        #     type="rect",
+        #     x0=section_dates.iloc[0],
+        #     x1=section_dates.iloc[-1],
+        #     y0=y_min,
+        #     y1=y_max,
+        #     fillcolor=fill_color,
+        #     line=dict(color=border_color, width=2, dash='dash'),
+        #     layer='below'
+        # )
         
         # Add annotation with pattern name and confidence
         fig.add_annotation(
@@ -377,13 +598,16 @@ else:
     3. **Choose duration** (6 months to 5 years)
     4. **Click "Detect Patterns"**
     
-    ### 🔺 Patterns Detected:
+    ### 🔺 Patterns Detected (11 Total):
     
     **Bullish Patterns:**
     - Inverse Head & Shoulders
     - Double Bottom
     - Ascending Triangle
     - Cup & Handle
+    - Flat Base *(NEW)*
+    - Saucer Base *(NEW)*
+    - Ascending Base *(NEW)*
     
     **Bearish Patterns:**
     - Head & Shoulders
@@ -397,7 +621,8 @@ else:
     
     - **Confidence Score:** Higher = More reliable pattern
     - **Target Price:** Expected price if pattern completes
-    - **Pattern Boxes:** Green (bullish), Red (bearish), Gray (neutral)
+    - **Pattern Boxes:** Green (bullish), Red (bearish), Orange (neutral)
+    - **Smooth Curves:** Blue/purple dotted lines show idealized pattern shape
     """)
 
 

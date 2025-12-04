@@ -83,6 +83,66 @@ except Exception as e:
     print(f"⚠️ Database not available: {e}")
     print("   Watchlists will work in session-only mode")
 
+
+def analyze_single_stock_for_compare(symbol, data_source='yahoo'):
+    """Analyze a single stock for comparison table"""
+    try:
+        from universal_cache import get_stock_data
+        
+        # Get stock data
+        df = get_stock_data(symbol, days=400, source=data_source)
+        if df is None or df.empty:
+            return {'symbol': symbol}
+        
+        # Calculate TR indicator
+        tr_result = analyze_tr_indicator(df.copy())
+        
+        # Get current price
+        current_price = df['Close'].iloc[-1] if 'Close' in df.columns else None
+        
+        # Get 52-week high/low
+        week_52_high = df['High'].tail(252).max() if 'High' in df.columns else None
+        week_52_low = df['Low'].tail(252).min() if 'Low' in df.columns else None
+        
+        # Calculate % from 52W high
+        pct_from_high = None
+        if current_price and week_52_high:
+            pct_from_high = ((current_price - week_52_high) / week_52_high) * 100
+        
+        # Get RSI
+        rsi = None
+        if 'RSI' in df.columns:
+            rsi = df['RSI'].iloc[-1]
+        elif len(df) >= 14:
+            # Calculate RSI
+            delta = df['Close'].diff()
+            gain = delta.where(delta > 0, 0).rolling(14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs.iloc[-1])) if loss.iloc[-1] != 0 else 100
+        
+        # Get EMAs
+        ema_50 = df['Close'].ewm(span=50).mean().iloc[-1] if len(df) >= 50 else None
+        ema_200 = df['Close'].ewm(span=200).mean().iloc[-1] if len(df) >= 200 else None
+        
+        return {
+            'symbol': symbol,
+            'price': current_price,
+            'tr_status': tr_result.get('signal', 'N/A') if tr_result else 'N/A',
+            'tr_value': tr_result.get('tr_value') if tr_result else None,
+            'ml_confidence': tr_result.get('ml_confidence') if tr_result else None,
+            'rsi': round(rsi, 1) if rsi else None,
+            'ema_50': ema_50,
+            'ema_200': ema_200,
+            'week_52_high': week_52_high,
+            'week_52_low': week_52_low,
+            'pct_from_52w_high': round(pct_from_high, 1) if pct_from_high else None,
+        }
+    except Exception as e:
+        print(f"Error analyzing {symbol}: {e}")
+        return {'symbol': symbol}
+
+
 st.set_page_config(
     page_title="Watchlists - MJ Software",
     page_icon="📋",
@@ -1804,7 +1864,7 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     selected_count = len(selected_symbols)
     
     # Single row with all action buttons - adjusted widths to prevent overlap
-    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5 = st.columns([1.5, 1, 0.8, 0.6, 0.8])
+    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5, btn_col6 = st.columns([1.5, 1, 0.8, 0.8, 0.8, 0.8])
     
     with btn_col1:
         button_help = "Analyze ALL stocks on Daily + Weekly timeframes" if is_multi_tf_view else "Analyze ALL stocks"
@@ -1842,19 +1902,63 @@ def show_watchlist_stocks_enhanced(watchlist_id):
             st.markdown(f"**{selected_count} selected**")
     
     with btn_col4:
+        # Compare button - enabled when 2-5 stocks selected
+        if 2 <= selected_count <= 5:
+            if st.button("📊 Compare", key=f"compare_btn_{watchlist_id}", use_container_width=True):
+                # Get selected stocks data - fetch if not available
+                selected_stock_data = []
+                stocks_to_fetch = []
+                
+                for sym in selected_symbols[:5]:
+                    cache_key = f"{sym}_tr_data"
+                    cached = st.session_state.stock_tr_cache.get(cache_key, {})
+                    if cached.get('price'):
+                        selected_stock_data.append(cached)
+                    else:
+                        stocks_to_fetch.append(sym)
+                
+                # Fetch data for stocks that don't have it
+                if stocks_to_fetch:
+                    with st.spinner(f"📊 Analyzing {', '.join(stocks_to_fetch)}..."):
+                        api_source = watchlist.get('data_source', 'yahoo')
+                        
+                        for sym in stocks_to_fetch:
+                            try:
+                                # Use get_shared_stock_data which has COMPLETE analysis
+                                analyzed_df = get_shared_stock_data(sym, 400, 'daily', api_source)
+                                
+                                if analyzed_df is not None and not analyzed_df.empty:
+                                    # Extract stock info using existing function
+                                    stock_info = extract_stock_data(analyzed_df, sym)
+                                    st.session_state.stock_tr_cache[f"{sym}_tr_data"] = stock_info
+                                    selected_stock_data.append(stock_info)
+                                else:
+                                    selected_stock_data.append({'symbol': sym})
+                            except Exception as e:
+                                print(f"Error analyzing {sym}: {e}")
+                                selected_stock_data.append({'symbol': sym})
+                
+                # Store in session state
+                st.session_state['compare_stocks'] = selected_symbols[:5]
+                st.session_state['compare_stock_data'] = selected_stock_data
+                st.session_state['show_compare_table'] = True
+                st.rerun()
+        else:
+            help_text = "Select 2-5 stocks to compare"
+            st.button("📊 Compare", key=f"compare_disabled_{watchlist_id}", disabled=True, use_container_width=True, help=help_text)
+    
+    with btn_col5:
         if selected_count == 1:
             if st.button("✏️ Edit", key=f"edit_btn_{watchlist_id}", use_container_width=True):
                 st.session_state[edit_mode_key] = True
-                # No rerun needed - dialog will show on next natural rerun
         else:
             st.button("✏️ Edit", key=f"edit_disabled_{watchlist_id}", disabled=True, use_container_width=True)
     
-    with btn_col5:
+    with btn_col6:
         if selected_count > 0:
             if st.button(f"🗑️ ({selected_count})", key=f"delete_btn_{watchlist_id}", use_container_width=True, help=f"Delete {selected_count} selected stock(s)"):
                 for sym in selected_symbols:
                     remove_stock_from_watchlist(watchlist_id, sym)
-                    # Clear the checkbox state
                     checkbox_key = f"sel_{watchlist_id}_{sym}"
                     if checkbox_key in st.session_state:
                         del st.session_state[checkbox_key]
@@ -2007,6 +2111,182 @@ def show_watchlist_stocks_enhanced(watchlist_id):
                 st.metric("Strong Sell", strong_sell)
         else:
             st.info("Click 'Analyze All' to see TR status for all stocks")
+
+
+# ============================================================================
+# COMPARISON TABLE DISPLAY (MODAL DIALOG)
+# ============================================================================
+
+@st.dialog("📊 Stock Comparison", width="large")
+def show_comparison_dialog():
+    """Display comparison table in a modal dialog"""
+    
+    if 'compare_stocks' not in st.session_state or not st.session_state['compare_stocks']:
+        st.warning("No stocks selected for comparison")
+        if st.button("Close"):
+            st.rerun()
+        return
+    
+    symbols = st.session_state['compare_stocks']
+    stock_data_list = st.session_state.get('compare_stock_data', [])
+    stock_data_dict = {s.get('symbol'): s for s in stock_data_list if s}
+    
+    # Helper functions
+    def format_price(value):
+        if value is None or value == 'N/A' or value == '':
+            return 'N/A'
+        try:
+            return f"${float(str(value).replace('$', '').replace(',', '')):,.2f}"
+        except:
+            return str(value)
+    
+    def calc_pct_from_high(stock):
+        """Calculate % from 52-week high"""
+        price = stock.get('price')
+        high = stock.get('week_52_high')
+        if price and high and price != 'N/A' and high != 'N/A':
+            try:
+                p = float(str(price).replace('$', '').replace(',', ''))
+                h = float(str(high).replace('$', '').replace(',', ''))
+                pct = ((p - h) / h) * 100
+                return f"{pct:.1f}%"
+            except:
+                pass
+        return 'N/A'
+    
+    def get_tr_display(stock):
+        """Format TR Status with color indicators"""
+        tr = stock.get('tr_status', 'N/A')
+        if not tr or tr == 'N/A':
+            return 'N/A'
+        
+        tr_str = str(tr)
+        
+        # Add color emoji based on status
+        if 'Strong Buy' in tr_str:
+            return f"🟢 {tr_str}"
+        elif 'Buy' in tr_str:
+            return f"🟢 {tr_str}"
+        elif 'Strong Sell' in tr_str:
+            return f"🔴 {tr_str}"
+        elif 'Sell' in tr_str:
+            return f"🟠 {tr_str}"
+        elif 'Neutral' in tr_str:
+            return f"⚪ {tr_str}"
+        else:
+            return tr_str
+    
+    def get_rsi_display(stock):
+        """Format RSI - just the number"""
+        rsi_val = stock.get('rsi')
+        if rsi_val is None or rsi_val == 'N/A':
+            return 'N/A'
+        try:
+            rsi = float(rsi_val)
+            return f"{rsi:.1f}"
+        except:
+            return str(rsi_val)
+    
+    def get_ema_signal(stock):
+        """Get EMA 50/200 crossover signal - no emoji"""
+        ema50 = stock.get('ema_50')
+        ema200 = stock.get('ema_200')
+        price = stock.get('price')
+        
+        if not all([ema50, ema200, price]):
+            return 'N/A'
+        try:
+            e50 = float(str(ema50).replace('$', '').replace(',', '')) if ema50 != 'N/A' else None
+            e200 = float(str(ema200).replace('$', '').replace(',', '')) if ema200 != 'N/A' else None
+            p = float(str(price).replace('$', '').replace(',', '')) if price != 'N/A' else None
+            
+            if not all([e50, e200, p]):
+                return 'N/A'
+            
+            if e50 > e200 and p > e50:
+                return 'Bullish'
+            elif e50 < e200 and p < e50:
+                return 'Bearish'
+            elif abs(e50 - e200) / e200 < 0.02:
+                return 'Crossing'
+            else:
+                return 'Mixed'
+        except:
+            return 'N/A'
+    
+    def get_alignment(stock):
+        """Get TR/Ichimoku alignment - no emoji for N/A"""
+        alignment = stock.get('alignment', 'N/A')
+        if alignment == 'N/A' or not alignment:
+            # Try to determine from TR status
+            tr = stock.get('tr_status', '')
+            if 'Strong Buy' in str(tr) or 'Buy' in str(tr):
+                return 'Bullish'
+            elif 'Strong Sell' in str(tr) or 'Sell' in str(tr):
+                return 'Bearish'
+            return 'N/A'
+        
+        al = str(alignment).lower()
+        if 'bull' in al or 'aligned' in al:
+            return 'Aligned'
+        elif 'bear' in al:
+            return 'Bearish'
+        elif 'mixed' in al:
+            return 'Mixed'
+        return str(alignment)
+    
+    def get_ml_confidence(stock):
+        """Get ML confidence if available - no emoji for N/A"""
+        ml = stock.get('ml_confidence')
+        if ml and ml != 'N/A':
+            try:
+                val = float(ml)
+                return f"{val:.0f}%"
+            except:
+                return str(ml)
+        return 'N/A'
+    
+    # Row definitions: (label, getter_function)
+    row_defs = [
+        ('Price', lambda s: format_price(s.get('price'))),
+        ('TR Status', get_tr_display),
+        ('TR/Ichimoku Combo', get_alignment),
+        ('RSI (14)', get_rsi_display),
+        ('EMA 50/200 Crossover', get_ema_signal),
+        ('52-Week High', lambda s: format_price(s.get('week_52_high'))),
+        ('% from 52W High', calc_pct_from_high),
+    ]
+    
+    # Create DataFrame for display
+    table_data = {'Indicator': [r[0] for r in row_defs]}
+    
+    for symbol in symbols:
+        stock = stock_data_dict.get(symbol, {'symbol': symbol})
+        col_values = []
+        for label, getter in row_defs:
+            try:
+                val = getter(stock)
+            except:
+                val = 'N/A'
+            col_values.append(val)
+        table_data[symbol] = col_values
+    
+    df = pd.DataFrame(table_data)
+    
+    # Display as styled table
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        height=350
+    )
+    
+    # Legend
+    st.caption("🟢 Buy Signal | 🟠 Sell Signal | ⚪ Neutral")
+    
+    if st.button("Close", key="close_compare_dialog"):
+        st.session_state['show_compare_table'] = False
+        st.rerun()
 
 
 # ============================================================================
@@ -2164,6 +2444,10 @@ def main():
                         st.rerun()
             
             st.divider()
+            
+            # Show comparison dialog if requested
+            if st.session_state.get('show_compare_table', False):
+                show_comparison_dialog()
             
             show_add_stock_form(st.session_state.active_watchlist)
             show_watchlist_stocks_enhanced(st.session_state.active_watchlist)
