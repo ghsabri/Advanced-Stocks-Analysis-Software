@@ -7,6 +7,7 @@ This predictor works with the hybrid TR models and shows:
 - Quality tier (Basic, Buy Point, Uptrend, ELITE)
 - Confidence factors
 - Elite badge when applicable
+- Performance metrics (Profit Factor, Expectancy, Sharpe Ratio)
 """
 
 import pandas as pd
@@ -15,6 +16,19 @@ import pickle
 import os
 import glob
 from datetime import datetime
+
+# Import metrics calculator
+try:
+    from ml_performance_metrics import calculate_estimated_metrics, format_metrics_display
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+
+# Cache for metrics (calculated once per model load)
+_cached_metrics = {
+    'daily': None,
+    'weekly': None
+}
 
 def load_latest_models():
     """Load the most recent TR models"""
@@ -230,6 +244,26 @@ def predict_confidence(signal_data, timeframe='Daily'):
     if signal_data['quality_level'] >= 2:
         factors.append('✅ High-quality setup')
     
+    # Calculate performance metrics (estimated based on model stats)
+    performance_metrics = None
+    if METRICS_AVAILABLE:
+        cache_key = 'daily' if timeframe == 'Daily' else 'weekly'
+        
+        # Use cached metrics if available
+        if _cached_metrics[cache_key] is None:
+            try:
+                raw_metrics = calculate_estimated_metrics(
+                    success_rate=model_data['success_rate'],
+                    avg_gain_pct=target,  # Use target as avg gain
+                    avg_loss_pct=target * 0.6,  # Assume avg loss is 60% of target
+                    training_samples=model_data['training_samples']
+                )
+                _cached_metrics[cache_key] = format_metrics_display(raw_metrics)
+            except Exception as e:
+                print(f"⚠️ Could not calculate metrics: {e}")
+        
+        performance_metrics = _cached_metrics[cache_key]
+    
     return {
         'confidence': round(confidence, 1),
         'confidence_level': confidence_level,
@@ -244,7 +278,8 @@ def predict_confidence(signal_data, timeframe='Daily'):
             'training_samples': model_data['training_samples'],
             'accuracy': round(model_data['accuracy'] * 100, 1),
             'success_rate': round(model_data['success_rate'] * 100, 1)
-        }
+        },
+        'performance_metrics': performance_metrics
     }
 
 def format_prediction_output(prediction):

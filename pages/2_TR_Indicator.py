@@ -357,6 +357,42 @@ if analyze_button and symbol:
                     
                     if prediction['is_elite']:
                         st.warning("⭐ **ELITE SIGNAL!** Use 10-15% targets instead of 5%")
+                    
+                    # Display Performance Metrics
+                    metrics = prediction.get('performance_metrics')
+                    if metrics:
+                        st.markdown("#### 📈 Strategy Performance Metrics")
+                        mcol1, mcol2, mcol3 = st.columns(3)
+                        with mcol1:
+                            pf = metrics['profit_factor']
+                            st.metric(
+                                f"{pf['emoji']} Profit Factor", 
+                                pf['display'],
+                                pf['rating'],
+                                help=pf['help']
+                            )
+                        with mcol2:
+                            exp = metrics['expectancy']
+                            st.metric(
+                                f"{exp['emoji']} Expectancy", 
+                                exp['display'],
+                                exp['rating'],
+                                help=exp['help']
+                            )
+                        with mcol3:
+                            ar = metrics['annual_return']
+                            st.metric(
+                                f"{ar['emoji']} Annual Return", 
+                                ar['display'],
+                                ar['rating'],
+                                help=ar['help']
+                            )
+                        
+                        # Show data source note
+                        if metrics.get('data_source') == 'estimated':
+                            st.caption(f"📊 Based on {metrics['total_trades']:,} training samples | Win Rate: {metrics['win_rate']}% | *Estimated metrics*")
+                        else:
+                            st.caption(f"📊 Based on {metrics['total_trades']:,} historical trades | Win Rate: {metrics['win_rate']}%")
                 
                 except Exception as e:
                     st.error(f"ML Error: {e}")

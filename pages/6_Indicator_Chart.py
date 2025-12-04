@@ -1666,7 +1666,7 @@ def create_ichimoku_chart(df, tenkan, kijun, senkou_a, senkou_b, ema_13, ema_30,
 
 
 def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema_period_2,
-                              buy_signals, sell_signals, signal_details, timeframe='Daily'):
+                              buy_signals, sell_signals, signal_details, timeframe='Daily', ml_results=None):
     """
     Create TR / Ichimoku Combo Strategy chart
     
@@ -1675,6 +1675,7 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
     - EMA lines (50/200 for Daily, 10/30 for Weekly) - for visual trend context
     - Buy signals (green triangles)
     - Sell signals (red triangles)
+    - ML confidence annotations (if available)
     
     Note: Ichimoku cloud is NOT plotted (used only for signal calculation)
     
@@ -1688,6 +1689,7 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
         sell_signals: List of indices for sell signals
         signal_details: List of dicts with signal information
         timeframe: 'Daily' or 'Weekly'
+        ml_results: Dict with 'buy_predictions' and 'sell_predictions' from ML model
     """
     
     # Ensure index is datetime
@@ -1868,6 +1870,80 @@ def create_enhanced_tr_chart(df, ema_display_1, ema_display_2, ema_period_1, ema
         font=dict(size=12),
         align="left"
     )
+    
+    # Add ML confidence annotations
+    if ml_results:
+        # Add ML confidence for BUY signals
+        if ml_results.get('buy_predictions'):
+            for idx, prediction in ml_results['buy_predictions']:
+                if idx < len(dates):
+                    try:
+                        confidence = prediction['confidence_pct']
+                        level = prediction['confidence_level']
+                        
+                        # Color based on confidence
+                        if confidence >= 75:
+                            color = '#00C853'  # Green
+                        elif confidence >= 60:
+                            color = '#FFD600'  # Yellow
+                        else:
+                            color = '#FF6D00'  # Orange
+                        
+                        fig.add_annotation(
+                            x=dates[idx],
+                            y=df['High'].iloc[idx] * 1.02,
+                            text=f"🤖 {confidence:.0f}%<br>{level}",
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=1,
+                            arrowcolor=color,
+                            font=dict(size=9, color=color),
+                            bgcolor='rgba(255,255,255,0.8)',
+                            bordercolor=color,
+                            borderwidth=1,
+                            borderpad=2,
+                            ax=0,
+                            ay=-40
+                        )
+                    except:
+                        pass
+        
+        # Add ML confidence for SELL signals
+        if ml_results.get('sell_predictions'):
+            for idx, prediction in ml_results['sell_predictions']:
+                if idx < len(dates):
+                    try:
+                        confidence = prediction['confidence_pct']
+                        level = prediction['confidence_level']
+                        
+                        # Color based on confidence
+                        if confidence >= 75:
+                            color = '#D50000'  # Red
+                        elif confidence >= 60:
+                            color = '#FF6D00'  # Orange
+                        else:
+                            color = '#FFD600'  # Yellow
+                        
+                        fig.add_annotation(
+                            x=dates[idx],
+                            y=df['Low'].iloc[idx] * 0.98,
+                            text=f"🤖 {confidence:.0f}%<br>{level}",
+                            showarrow=True,
+                            arrowhead=2,
+                            arrowsize=1,
+                            arrowwidth=1,
+                            arrowcolor=color,
+                            font=dict(size=9, color=color),
+                            bgcolor='rgba(255,255,255,0.8)',
+                            bordercolor=color,
+                            borderwidth=1,
+                            borderpad=2,
+                            ax=0,
+                            ay=40
+                        )
+                    except:
+                        pass
     
     return fig
 
@@ -2855,11 +2931,13 @@ if update_button:
                         ema_13, ema_30, ema_200,
                         senkou_a, senkou_b
                     )
-                    # st.write(f"DEBUG: ML Results = {ml_results}")  # ADD THIS LINE
+                    # Store ML results for metrics display
+                    st.session_state['ichimoku_ml_results'] = ml_results
 
                 except Exception as e:
                     st.warning(f"⚠️ ML predictions unavailable: {str(e)}")
                     ml_results = {'buy_predictions': [], 'sell_predictions': []}
+                    st.session_state['ichimoku_ml_results'] = ml_results
                 
                 # Create Ichimoku chart (single panel)
                 fig = create_ichimoku_chart(
@@ -2923,6 +3001,21 @@ if update_button:
                     df, tr_data, ema_13, ema_30, senkou_a, senkou_b
                 )
                 
+                # Get ML confidence scores for Combo signals (using Ichimoku ML)
+                try:
+                    ema_200 = calculate_ema(df, 200)
+                    combo_ml_results = get_ml_confidence_for_signals(
+                        df, buy_signals, sell_signals,
+                        ema_13, ema_30, ema_200,
+                        senkou_a, senkou_b
+                    )
+                    # Store ML results for metrics display
+                    st.session_state['combo_ml_results'] = combo_ml_results
+                except Exception as e:
+                    st.warning(f"⚠️ ML predictions unavailable: {str(e)}")
+                    combo_ml_results = {'buy_predictions': [], 'sell_predictions': []}
+                    st.session_state['combo_ml_results'] = combo_ml_results
+                
                 # Create chart
                 fig = create_enhanced_tr_chart(
                     df=df,
@@ -2933,7 +3026,8 @@ if update_button:
                     buy_signals=buy_signals,
                     sell_signals=sell_signals,
                     signal_details=signal_details,
-                    timeframe=timeframe
+                    timeframe=timeframe,
+                    ml_results=combo_ml_results
                 )
                 
                 # Store signal details for table display
@@ -2982,9 +3076,158 @@ if update_button:
 if 'indicator_chart_fig' in st.session_state:
     st.plotly_chart(st.session_state['indicator_chart_fig'], use_container_width=True)
     
-    # Display TR / Ichimoku Combo Strategy table if available
+    # Display Ichimoku ML Performance Metrics if available
+    if 'indicator_chart_data' in st.session_state:
+        if st.session_state['indicator_chart_data'].get('indicator') == 'Ichimoku Cloud':
+            if 'ichimoku_ml_results' in st.session_state:
+                ml_results = st.session_state['ichimoku_ml_results']
+                
+                # Get metrics from the first prediction (they're the same for all signals of same timeframe)
+                if ml_results.get('buy_predictions') or ml_results.get('sell_predictions'):
+                    # Try to get metrics from first available prediction
+                    first_pred = None
+                    if ml_results.get('buy_predictions'):
+                        first_pred = ml_results['buy_predictions'][0][1]
+                    elif ml_results.get('sell_predictions'):
+                        first_pred = ml_results['sell_predictions'][0][1]
+                    
+                    if first_pred and first_pred.get('performance_metrics'):
+                        metrics = first_pred['performance_metrics']
+                        
+                        st.markdown("### 📈 Ichimoku Strategy Performance Metrics")
+                        mcol1, mcol2, mcol3 = st.columns(3)
+                        
+                        with mcol1:
+                            pf = metrics['profit_factor']
+                            st.metric(
+                                f"{pf['emoji']} Profit Factor", 
+                                pf['display'],
+                                pf['rating'],
+                                help=pf['help']
+                            )
+                        with mcol2:
+                            exp = metrics['expectancy']
+                            st.metric(
+                                f"{exp['emoji']} Expectancy", 
+                                exp['display'],
+                                exp['rating'],
+                                help=exp['help']
+                            )
+                        with mcol3:
+                            ar = metrics['annual_return']
+                            st.metric(
+                                f"{ar['emoji']} Annual Return", 
+                                ar['display'],
+                                ar['rating'],
+                                help=ar['help']
+                            )
+                        
+                        # Show data source note
+                        if metrics.get('data_source') == 'estimated':
+                            st.caption(f"📊 Based on {metrics['total_trades']:,} training samples | Win Rate: {metrics['win_rate']}% | *Estimated metrics*")
+                        else:
+                            st.caption(f"📊 Based on {metrics['total_trades']:,} historical trades | Win Rate: {metrics['win_rate']}%")
+    
+    # Display TR / Ichimoku Combo Strategy ML metrics and table
     if 'indicator_chart_data' in st.session_state:
         if st.session_state['indicator_chart_data'].get('indicator') == 'TR / Ichimoku Combo Strategy':
+            # Display ML Performance Metrics for Combo Strategy
+            if 'combo_ml_results' in st.session_state:
+                ml_results = st.session_state['combo_ml_results']
+                
+                # Get metrics from the first prediction
+                if ml_results.get('buy_predictions') or ml_results.get('sell_predictions'):
+                    first_pred = None
+                    if ml_results.get('buy_predictions'):
+                        first_pred = ml_results['buy_predictions'][0][1]
+                    elif ml_results.get('sell_predictions'):
+                        first_pred = ml_results['sell_predictions'][0][1]
+                    
+                    if first_pred:
+                        # ML Confidence Summary Section (like TR Indicator)
+                        st.markdown("### 🤖 ML Confidence Score")
+                        
+                        # Calculate average confidence from all predictions
+                        all_confidences = []
+                        if ml_results.get('buy_predictions'):
+                            for _, pred in ml_results['buy_predictions']:
+                                all_confidences.append(pred['confidence_pct'])
+                        if ml_results.get('sell_predictions'):
+                            for _, pred in ml_results['sell_predictions']:
+                                all_confidences.append(pred['confidence_pct'])
+                        
+                        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0
+                        
+                        # Determine confidence level
+                        if avg_confidence >= 75:
+                            conf_level = 'Very High'
+                        elif avg_confidence >= 65:
+                            conf_level = 'High'
+                        elif avg_confidence >= 55:
+                            conf_level = 'Moderate'
+                        elif avg_confidence >= 45:
+                            conf_level = 'Low'
+                        else:
+                            conf_level = 'Very Low'
+                        
+                        conf_emoji = "🔥" if avg_confidence >= 70 else "✅" if avg_confidence >= 60 else "⚠️" if avg_confidence >= 50 else "❌"
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric(
+                                f"{conf_emoji} Avg ML Confidence", 
+                                f"{avg_confidence:.1f}%", 
+                                conf_level
+                            )
+                        with col2:
+                            timeframe = st.session_state['indicator_chart_data'].get('timeframe', 'Daily')
+                            target = "5%" if timeframe == 'Daily' else "8%"
+                            st.metric("🎯 Target", target, timeframe)
+                        with col3:
+                            model_accuracy = first_pred.get('model_accuracy', 91.5)
+                            st.metric("📊 Model Accuracy", f"{model_accuracy}%", "Ichimoku ML")
+                        
+                        st.markdown("---")
+                        
+                        # Performance Metrics Section
+                        if first_pred.get('performance_metrics'):
+                            metrics = first_pred['performance_metrics']
+                            
+                            st.markdown("### 📈 Strategy Performance Metrics")
+                            mcol1, mcol2, mcol3 = st.columns(3)
+                            
+                            with mcol1:
+                                pf = metrics['profit_factor']
+                                st.metric(
+                                    f"{pf['emoji']} Profit Factor", 
+                                    pf['display'],
+                                    pf['rating'],
+                                    help=pf['help']
+                                )
+                            with mcol2:
+                                exp = metrics['expectancy']
+                                st.metric(
+                                    f"{exp['emoji']} Expectancy", 
+                                    exp['display'],
+                                    exp['rating'],
+                                    help=exp['help']
+                                )
+                            with mcol3:
+                                ar = metrics['annual_return']
+                                st.metric(
+                                    f"{ar['emoji']} Annual Return", 
+                                    ar['display'],
+                                    ar['rating'],
+                                    help=ar['help']
+                                )
+                            
+                            # Show data source note
+                            if metrics.get('data_source') == 'estimated':
+                                st.caption(f"📊 Based on {metrics['total_trades']:,} training samples | Win Rate: {metrics['win_rate']}% | *Estimated metrics (using Ichimoku ML)*")
+                            else:
+                                st.caption(f"📊 Based on {metrics['total_trades']:,} historical trades | Win Rate: {metrics['win_rate']}% | *Using Ichimoku ML model*")
+            
+            # Display signals table
             if 'enhanced_tr_signals' in st.session_state and st.session_state['enhanced_tr_signals']:
                 st.markdown("### 📋 Recent Signals (Last 20)")
                 

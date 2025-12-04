@@ -9,6 +9,13 @@ import pickle
 import os
 from typing import Dict, Optional
 
+# Import metrics calculator
+try:
+    from ml_performance_metrics import calculate_metrics_from_test_data, format_metrics_display
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -79,6 +86,8 @@ class IchimokuMLPredictor:
             self.daily_features = daily_dict['feature_cols']
             self.daily_accuracy = daily_dict['accuracy']
             self.daily_model_name = daily_dict['best_model_name']
+            # Store test data for metrics calculation
+            self.daily_test_data = daily_dict.get('test_data', None)
         
         with open(weekly_path, 'rb') as f:
             weekly_dict = pickle.load(f)
@@ -86,6 +95,31 @@ class IchimokuMLPredictor:
             self.weekly_features = weekly_dict['feature_cols']
             self.weekly_accuracy = weekly_dict['accuracy']
             self.weekly_model_name = weekly_dict['best_model_name']
+            # Store test data for metrics calculation
+            self.weekly_test_data = weekly_dict.get('test_data', None)
+        
+        # Calculate performance metrics if test data available
+        self.daily_metrics = None
+        self.weekly_metrics = None
+        
+        if METRICS_AVAILABLE:
+            if self.daily_test_data is not None:
+                try:
+                    X_test, y_test = self.daily_test_data
+                    raw_metrics = calculate_metrics_from_test_data(X_test, y_test)
+                    self.daily_metrics = format_metrics_display(raw_metrics)
+                    print(f"✅ Daily Metrics: PF={self.daily_metrics['profit_factor']['value']:.2f}, Exp={self.daily_metrics['expectancy']['value']:.2f}%")
+                except Exception as e:
+                    print(f"⚠️ Could not calculate daily metrics: {e}")
+            
+            if self.weekly_test_data is not None:
+                try:
+                    X_test, y_test = self.weekly_test_data
+                    raw_metrics = calculate_metrics_from_test_data(X_test, y_test)
+                    self.weekly_metrics = format_metrics_display(raw_metrics)
+                    print(f"✅ Weekly Metrics: PF={self.weekly_metrics['profit_factor']['value']:.2f}, Exp={self.weekly_metrics['expectancy']['value']:.2f}%")
+                except Exception as e:
+                    print(f"⚠️ Could not calculate weekly metrics: {e}")
         
         print(f"✅ Daily Model Loaded: {self.daily_model_name} ({self.daily_accuracy:.1%} accuracy)")
         print(f"✅ Weekly Model Loaded: {self.weekly_model_name} ({self.weekly_accuracy:.1%} accuracy)")
@@ -304,6 +338,9 @@ class IchimokuMLPredictor:
         # Get confidence factors
         confidence_factors = self._get_confidence_factors(features, model, feature_cols)
         
+        # Get performance metrics for this timeframe
+        metrics = self.daily_metrics if timeframe == 'Daily' else self.weekly_metrics
+        
         # Return complete prediction
         return {
             'confidence_pct': round(confidence_pct, 1),
@@ -313,7 +350,8 @@ class IchimokuMLPredictor:
             'model_accuracy': round(model_accuracy * 100, 1),
             'confidence_factors': confidence_factors,
             'raw_probability': round(confidence_raw, 4),
-            'timeframe': timeframe
+            'timeframe': timeframe,
+            'performance_metrics': metrics
         }
 
 # ============================================================================
