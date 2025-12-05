@@ -147,6 +147,60 @@ with col2:
                 st.session_state['username'] = None
                 st.rerun()
 
+# Troubleshooting section - outside col2, aligned with footer
+if st.session_state.get('logged_in', False):
+    st.markdown("---")
+    
+    with st.expander("🔧 Troubleshooting", expanded=False):
+        ts_col1, ts_col2 = st.columns([1, 1])
+        
+        with ts_col1:
+            st.markdown("""
+            **🔄 Reset Session**
+            
+            This will:
+            - Clear all cached stock data
+            - Reset your current session state
+            - Reload watchlists from database
+            """)
+        
+        with ts_col2:
+            st.markdown("""
+            **When to use:**
+            - If you see stale or incorrect data
+            - If the app is behaving unexpectedly
+            - After a major update
+            """)
+        
+        # Confirmation checkbox and button
+        confirm_reset = st.checkbox("I understand, proceed with reset", key="confirm_reset")
+        
+        if st.button("🔄 Reset Session", disabled=not confirm_reset):
+            # Clear Streamlit's function cache
+            st.cache_data.clear()
+            
+            # Clear universal cache (.pkl files on disk)
+            try:
+                import os
+                import glob
+                cache_files = glob.glob("*.pkl") + glob.glob("cache/*.pkl")
+                for f in cache_files:
+                    try:
+                        os.remove(f)
+                    except:
+                        pass
+            except Exception as e:
+                print(f"Warning: Could not clear cache files: {e}")
+            
+            # Clear session state (keep only login info)
+            keys_to_keep = ['logged_in', 'username']
+            keys_to_delete = [k for k in st.session_state.keys() if k not in keys_to_keep]
+            for key in keys_to_delete:
+                del st.session_state[key]
+            
+            st.success("✅ Session reset complete!")
+            st.rerun()
+
 # Footer
 st.markdown("---")
 

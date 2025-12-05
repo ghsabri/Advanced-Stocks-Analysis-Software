@@ -152,9 +152,76 @@ st.set_page_config(
 # CSS for styling
 st.markdown("""
 <style>
-    /* EXTREME COMPACT STYLING FOR WATCHLIST ROWS */
+    /* ============================================== */
+    /* COMPACT MOBILE-FRIENDLY WATCHLIST             */
+    /* ============================================== */
     
-    /* Center align all column content */
+    /* REDUCE GLOBAL SPACING */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 100% !important;
+    }
+    
+    /* Reduce spacing between all elements */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.25rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Headings - reduce margins */
+    h1, h2, h3 {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+        padding: 0 !important;
+    }
+    
+    /* Subheader specific */
+    [data-testid="stSubheader"] {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Dividers - minimal space */
+    hr {
+        margin: 0.5rem 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-top: 1px solid #e0e0e0 !important;
+    }
+    
+    /* Expanders - reduce padding */
+    .streamlit-expanderHeader {
+        padding: 0.5rem !important;
+        font-size: 14px !important;
+    }
+    
+    [data-testid="stExpander"] {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Form elements - tighter */
+    .stTextInput, .stSelectbox {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    .stTextInput > div, .stSelectbox > div {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Radio buttons - compact */
+    .stRadio > div {
+        gap: 0.5rem !important;
+    }
+    
+    /* Caption text - less space */
+    .stCaption {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Center align column content in main area */
     div[data-testid="stMain"] div[data-testid="column"] {
         display: flex !important;
         align-items: center !important;
@@ -167,56 +234,54 @@ st.markdown("""
         text-align: center !important;
     }
     
-    /* Compact buttons in main area ONLY - not sidebar */
+    /* Action buttons (Analyze All, Export, etc.) */
     div[data-testid="stMain"] .stButton > button {
-        height: 24px !important;
-        padding: 3px 8px !important;
-        font-size: 11px !important;
+        height: 32px !important;
+        padding: 4px 12px !important;
+        font-size: 13px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        line-height: 1.1 !important;
+        line-height: 1.2 !important;
         margin: 0 !important;
         vertical-align: middle !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-width: 50px !important;
-        max-width: 80px !important;
     }
     
-    /* Symbol link button - no box, looks like link */
+    /* Symbol link button - styled as link */
     div[data-testid="stMain"] button[kind="tertiary"] {
         background: transparent !important;
-        border: none !important;
+        border: 1px solid #ddd !important;
+        border-radius: 4px !important;
         color: #1f77b4 !important;
         font-weight: bold !important;
-        padding: 0 !important;
-        min-width: auto !important;
-        max-width: none !important;
-        text-decoration: none !important;
+        padding: 2px 8px !important;
+        font-size: 12px !important;
+        height: 26px !important;
     }
     
     div[data-testid="stMain"] button[kind="tertiary"]:hover {
         color: #0d5a9e !important;
-        text-decoration: underline !important;
-        background: transparent !important;
+        background: #f0f8ff !important;
+        border-color: #1f77b4 !important;
     }
     
-    /* Sort header buttons - look like headers */
+    /* Sort header buttons */
     div[data-testid="stMain"] button[kind="secondary"] {
-        background: transparent !important;
+        background: #f5f5f5 !important;
         border: none !important;
+        border-bottom: 2px solid #ccc !important;
         font-weight: bold !important;
         color: #333 !important;
-        min-width: auto !important;
-        max-width: none !important;
-        padding: 2px 4px !important;
+        padding: 4px 6px !important;
         font-size: 12px !important;
+        height: 28px !important;
     }
     
     div[data-testid="stMain"] button[kind="secondary"]:hover {
-        background: #f0f0f0 !important;
+        background: #e8e8e8 !important;
         cursor: pointer !important;
     }
     
@@ -231,108 +296,89 @@ st.markdown("""
     }
     
     .stDownloadButton > button {
-        height: 24px !important;
-        padding: 3px 6px !important;
-        font-size: 11px !important;
+        height: 32px !important;
+        padding: 4px 10px !important;
+        font-size: 12px !important;
         white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        min-width: 90px !important;
     }
     
-    /* Checkbox - ultra compact */
+    /* Checkbox - compact */
     .stCheckbox {
         margin: 0 !important;
         padding: 0 !important;
-        min-height: 20px !important;
-        height: 20px !important;
+        min-height: 24px !important;
+        height: 24px !important;
     }
     
     .stCheckbox > label {
         padding: 0 !important;
         margin: 0 !important;
-        min-height: 20px !important;
+        min-height: 24px !important;
     }
     
-    /* EXTREME compact row spacing */
+    /* Data row columns */
     [data-testid="column"] {
-        padding: 0px !important;
+        padding: 2px 4px !important;
         margin: 0px !important;
         display: flex !important;
         align-items: center !important;
-        min-height: 24px !important;
-        max-height: 26px !important;
-        line-height: 1.1 !important;
+        justify-content: center !important;
+        min-height: 28px !important;
+        max-height: 32px !important;
+        line-height: 1.2 !important;
     }
     
-    /* Force compact rows in watchlist */
+    /* Horizontal blocks (rows) */
     [data-testid="stHorizontalBlock"] {
-        gap: 0px !important;
+        gap: 2px !important;
         padding: 0px !important;
         margin: 0px !important;
+        min-height: 28px !important;
     }
     
-    /* Remove ALL spacing around text */
+    /* Text in data cells */
     .stMarkdown {
         margin: 0px !important;
         padding: 0px !important;
         display: flex !important;
         align-items: center !important;
+        justify-content: center !important;
         min-height: 24px !important;
-        max-height: 26px !important;
-        line-height: 1.1 !important;
+        line-height: 1.2 !important;
+        font-size: 13px !important;
     }
     
     .stMarkdown p {
         margin: 0px !important;
         padding: 0px !important;
-        line-height: 1.1 !important;
+        line-height: 1.2 !important;
+        font-size: 13px !important;
+        text-align: center !important;
     }
     
-    /* Ultra tight element containers */
+    /* Element containers */
     .element-container {
         margin: 0px !important;
         padding: 0px !important;
     }
     
-    /* ZERO gap between rows - most aggressive */
-    div[data-testid="stVerticalBlock"] > div {
-        gap: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
+    /* Spinner/Progress styling */
+    .stSpinner {
+        margin: 10px 0 !important;
+        padding: 10px !important;
+        background: #f9f9f9 !important;
+        border-radius: 5px !important;
     }
     
-    /* Block element - no spacing */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0rem !important;
-    }
-    
-    /* Remove default streamlit spacing */
-    .css-1y4p8pa, .css-12oz5g7 {
-        padding: 0px !important;
-        margin: 0px !important;
-    }
-    
-    /* Minimal horizontal rule spacing */
-    hr {
-        margin: 0px !important;
-        padding: 0px !important;
-        border: 0 !important;
-        border-top: 1px solid #e0e0e0 !important;
-        height: 1px !important;
-    }
-    
-    /* TR status badges - larger font (13px) for readability */
+    /* TR status badges */
     .tr-strong-buy {
         background-color: #00CC00;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
@@ -340,97 +386,157 @@ st.markdown("""
     .tr-buy {
         background-color: #66CC66;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-neutral {
-        background-color: #FFCC00;
-        color: black;
-        padding: 4px 10px;
-        border-radius: 3px;
+        background-color: #808080;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-sell {
-        background-color: #FF6666;
+        background-color: #FFA500;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-strong-sell {
-        background-color: #CC0000;
+        background-color: #FF0000;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
     
     .tr-loading {
-        background-color: #999999;
-        color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
-        font-weight: bold;
-        font-size: 13px;
+        background-color: #cccccc;
+        color: #666;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
         display: inline-block;
-        min-height: 24px;
         line-height: 1.3;
         vertical-align: middle;
     }
     
-    /* Alignment badges for TR Indicator Daily/Weekly Scan */
-    .align-bull {
-        background-color: #00AA00;
+    /* Alignment badges */
+    .alignment-bullish, .align-bull {
+        background-color: #00CC00;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
     }
     
-    .align-bear {
-        background-color: #CC0000;
+    .alignment-bearish, .align-bear {
+        background-color: #FF0000;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
         font-weight: bold;
-        font-size: 13px;
+        font-size: 12px;
         display: inline-block;
     }
     
-    .align-mixed {
+    .alignment-neutral, .align-mixed {
         background-color: #FF9900;
         color: white;
-        padding: 4px 10px;
-        border-radius: 3px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 12px;
+        display: inline-block;
+    }
+    
+    /* Percentage colors */
+    .pct-positive {
+        color: green;
         font-weight: bold;
         font-size: 13px;
-        display: inline-block;
+    }
+    
+    .pct-negative {
+        color: red;
+        font-weight: bold;
+        font-size: 13px;
+    }
+    
+    .pct-neutral {
+        color: #333;
+        font-size: 13px;
+    }
+    
+    /* Row divider */
+    .row-divider {
+        height: 1px;
+        background: #e8e8e8;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Dialog styling - keep normal */
+    [data-testid="stModal"] .stMarkdown {
+        font-size: 14px !important;
+        min-height: auto !important;
+        max-height: none !important;
+    }
+    
+    [data-testid="stModal"] [data-testid="column"] {
+        min-height: auto !important;
+        max-height: none !important;
+    }
+    
+    [data-testid="stModal"] .stMarkdown p {
+        font-size: 14px !important;
+    }
+    
+    /* MOBILE RESPONSIVE */
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 0.5rem !important;
+        }
+        
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        
+        .stButton > button {
+            font-size: 11px !important;
+            padding: 3px 8px !important;
+        }
+        
+        .stMarkdown, .stMarkdown p {
+            font-size: 11px !important;
+        }
+        
+        [data-testid="column"] {
+            padding: 1px 2px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -2423,10 +2529,10 @@ def show_quick_chart_dialog():
     
     st.divider()
     
-    # TradingView Widget
+    # TradingView Advanced Chart with EMA 20 and EMA 50
     tradingview_html = f'''
     <div class="tradingview-widget-container" style="height:450px;width:100%;">
-      <div id="tradingview_chart" style="height:100%;width:100%;"></div>
+      <div id="tradingview_chart_{current_symbol}" style="height:100%;width:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
       new TradingView.widget({{
@@ -2442,9 +2548,12 @@ def show_quick_chart_dialog():
         "hide_top_toolbar": false,
         "hide_legend": false,
         "save_image": false,
-        "container_id": "tradingview_chart",
+        "container_id": "tradingview_chart_{current_symbol}",
         "hide_volume": false,
-        "studies": ["MASimple@tv-basicstudies"],
+        "studies": [
+          {{"id": "MAExp@tv-basicstudies", "inputs": {{"length": 20}}}},
+          {{"id": "MAExp@tv-basicstudies", "inputs": {{"length": 50}}}}
+        ],
         "show_popup_button": false,
         "popup_width": "1000",
         "popup_height": "650"
@@ -2486,47 +2595,6 @@ def main():
     
     st.markdown("*Create and manage stock watchlists with **35 available fields** including Daily + Weekly TR Scan*")
     st.divider()
-    
-    # Emergency reset button (for debugging)
-    with st.sidebar.expander("🔧 Advanced", expanded=False):
-        st.caption("**Troubleshooting Tools:**")
-        if st.button("🗑️ Clear All Cache", key="clear_cache_btn"):
-            # Clear session state caches
-            st.session_state.stock_tr_cache = {}
-            st.session_state.stock_tr_cache_daily = {}
-            st.session_state.stock_tr_cache_weekly = {}
-            # Clear Streamlit's function cache (get_shared_stock_data, etc.)
-            st.cache_data.clear()
-            # Clear universal cache (.pkl files on disk)
-            try:
-                clear_universal_cache()
-            except Exception as e:
-                print(f"Warning: Could not clear universal cache: {e}")
-            st.success("✅ All caches cleared (session + Streamlit + disk)!")
-            st.rerun()
-        
-        if st.button("🔄 Reset Session", key="reset_session_btn"):
-            # Clear Streamlit's function cache first
-            st.cache_data.clear()
-            # Clear universal cache (.pkl files on disk)
-            try:
-                clear_universal_cache()
-            except Exception as e:
-                print(f"Warning: Could not clear universal cache: {e}")
-            # Then clear session state
-            keys_to_keep = ['logged_in']
-            keys_to_delete = [k for k in st.session_state.keys() if k not in keys_to_keep]
-            for key in keys_to_delete:
-                del st.session_state[key]
-            st.rerun()
-        
-        if st.button("🔄 Reload from Database", key="reload_db_btn"):
-            # Clear watchlists and db_loaded flag to force reload
-            st.session_state.watchlists = {}
-            st.session_state.active_watchlist = None
-            st.session_state.db_loaded = False
-            st.success("✅ Reloading watchlists from database...")
-            st.rerun()
     
     show_watchlist_selector()
     show_create_watchlist_form()
