@@ -643,6 +643,19 @@ def initialize_session_state():
     if 'stock_tr_cache_weekly' not in st.session_state:
         st.session_state.stock_tr_cache_weekly = {}
     
+    # Track current page to detect navigation (reset dialogs when coming from another page)
+    current_page = 'watchlists'
+    last_page = st.session_state.get('last_visited_page', None)
+    
+    if last_page != current_page:
+        # User navigated here from another page - close any open dialogs
+        st.session_state['show_quick_chart'] = False
+        st.session_state['show_compare_table'] = False
+        if 'quick_chart_index' in st.session_state:
+            del st.session_state['quick_chart_index']
+    
+    st.session_state['last_visited_page'] = current_page
+    
     # Flag to track if we've already loaded from database this session
     # This prevents duplicate loading on every st.rerun()
     if 'db_loaded' not in st.session_state:
@@ -1594,8 +1607,7 @@ def show_add_stock_form(watchlist_id):
     )
     
     if add_method == "Manual Entry":
-        # Original manual entry method
-        st.markdown("Enter stock symbol(s)")
+        # Original manual entry method - compact layout
         col1, col2 = st.columns([4, 1])
         
         with col1:
@@ -1603,7 +1615,6 @@ def show_add_stock_form(watchlist_id):
                 "Enter stock symbol(s)",
                 placeholder="Single: AAPL  OR  Bulk: AAPL, MSFT, GOOGL, TSLA",
                 key=f"add_stock_input_{watchlist_id}",
-                help="Enter one symbol or multiple separated by commas",
                 label_visibility="collapsed"
             )
         
@@ -1731,7 +1742,6 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     # ========================================================================
     
     st.subheader("⚙️ Choose View")
-    
     view_col1, view_col2, view_col3 = st.columns([2, 2, 1])
     
     with view_col1:
@@ -1746,7 +1756,8 @@ def show_watchlist_stocks_enhanced(watchlist_id):
             "Select View",
             preset_options,
             index=preset_options.index(current_view),
-            key=f"view_selector_{watchlist_id}"
+            key=f"view_selector_{watchlist_id}",
+            label_visibility="collapsed"
         )
     
     with view_col2:
@@ -1760,13 +1771,13 @@ def show_watchlist_stocks_enhanced(watchlist_id):
                 "Custom Template",
                 custom_view_names,
                 index=custom_view_names.index(current_custom) if current_custom in custom_view_names else 0,
-                key=f"custom_view_selector_{watchlist_id}"
+                key=f"custom_view_selector_{watchlist_id}",
+                label_visibility="collapsed"
             )
             
             watchlist['custom_view_name'] = selected_custom_view
     
     with view_col3:
-        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("⚙️ Customize Columns", key=f"customize_btn_{watchlist_id}"):
             st.session_state[f'show_customizer_{watchlist_id}'] = True
     
@@ -2187,8 +2198,14 @@ def show_watchlist_stocks_enhanced(watchlist_id):
         checkbox_key = f"sel_{watchlist_id}_{symbol}"
         
         # Checkbox - use symbol-based key (not index-based) for stability
+        # When checkbox state changes, close any open dialogs
         with data_cols[0]:
+            prev_state = st.session_state.get(checkbox_key, False)
             st.checkbox("", key=checkbox_key, label_visibility="collapsed")
+            # If checkbox was toggled, close dialogs
+            if st.session_state.get(checkbox_key, False) != prev_state:
+                st.session_state['show_quick_chart'] = False
+                st.session_state['show_compare_table'] = False
         
         # Data columns
         for col_idx, col_id in enumerate(columns_to_show):
@@ -2529,7 +2546,9 @@ def show_quick_chart_dialog():
     
     st.divider()
     
-    # TradingView Advanced Chart with EMA 20 and EMA 50
+    # TradingView Chart with EMA 20 and EMA 50 (using 2 MA Cross for different colors)
+    # Note: Free TradingView widget has limited styling options
+    # Users can customize colors via the chart toolbar if needed
     tradingview_html = f'''
     <div class="tradingview-widget-container" style="height:450px;width:100%;">
       <div id="tradingview_chart_{current_symbol}" style="height:100%;width:100%;"></div>
@@ -2565,8 +2584,8 @@ def show_quick_chart_dialog():
     import streamlit.components.v1 as components
     components.html(tradingview_html, height=470)
     
-    # Keyboard hint
-    st.caption("💡 Use Prev/Next buttons to navigate through watchlist stocks")
+    # Hint
+    st.caption("💡 EMA 20 & EMA 50 shown • Press ESC or click X to close")
 
 
 # ============================================================================
@@ -2585,15 +2604,12 @@ def main():
     
     initialize_session_state()
     
-    st.title("📋 Watchlists")
-    
-    # Show batch fetching status
+    # Show batch fetching status (compact, above title)
     if BATCH_FETCHING_AVAILABLE:
-        st.markdown("*✅ **BATCH FETCHING ENABLED** | 🆕 **TR Indicator Daily/Weekly Scan** now available!*")
-    else:
-        st.markdown("*⚠️ Sequential mode (batch fetching not available)*")
+        st.caption("✅ BATCH FETCHING ENABLED | 🆕 TR Indicator Daily/Weekly Scan available")
     
-    st.markdown("*Create and manage stock watchlists with **35 available fields** including Daily + Weekly TR Scan*")
+    # Title with smaller subtitle on same line
+    st.markdown("# 📋 Watchlists <span style='font-size: 16px; font-weight: normal; color: #666;'>— Create and manage stock watchlists with 35 available fields</span>", unsafe_allow_html=True)
     st.divider()
     
     show_watchlist_selector()
@@ -2636,18 +2652,6 @@ def main():
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.header(f"📊 {watchlist['name']}")
-                
-                # Handle both datetime and string formats for created_at
-                created_at = watchlist.get('created_at', datetime.now())
-                if isinstance(created_at, str):
-                    # If it's a string, just display as-is
-                    created_str = created_at
-                elif isinstance(created_at, datetime):
-                    created_str = created_at.strftime('%B %d, %Y')
-                else:
-                    created_str = "Unknown"
-                
-                st.caption(f"Created: {created_str}")
             
             with col2:
                 with st.expander("⚙️ Settings", expanded=False):
@@ -2684,16 +2688,15 @@ def main():
             
             st.divider()
             
-            # Show comparison dialog if requested
+            show_add_stock_form(st.session_state.active_watchlist)
+            show_watchlist_stocks_enhanced(st.session_state.active_watchlist)
+            
+            # Show dialogs AFTER stock list (so checkbox clicks can clear dialog state first)
             if st.session_state.get('show_compare_table', False):
                 show_comparison_dialog()
             
-            # Show quick chart dialog if requested
             if st.session_state.get('show_quick_chart', False):
                 show_quick_chart_dialog()
-            
-            show_add_stock_form(st.session_state.active_watchlist)
-            show_watchlist_stocks_enhanced(st.session_state.active_watchlist)
         else:
             st.error("Watchlist not found")
 
