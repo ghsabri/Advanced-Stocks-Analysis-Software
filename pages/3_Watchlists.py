@@ -1864,12 +1864,16 @@ def show_watchlist_stocks_enhanced(watchlist_id):
     selected_count = len(selected_symbols)
     
     # Single row with all action buttons - adjusted widths to prevent overlap
-    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5, btn_col6 = st.columns([1.5, 1, 0.8, 0.8, 0.8, 0.8])
+    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5, btn_col6, btn_col7 = st.columns([1.5, 1, 0.8, 0.8, 0.7, 0.7, 0.7])
     
     with btn_col1:
         button_help = "Analyze ALL stocks on Daily + Weekly timeframes" if is_multi_tf_view else "Analyze ALL stocks"
         if st.button("🚀 Analyze All", key=f"batch_analyze_{watchlist_id}", 
                     type="primary", use_container_width=True, help=button_help):
+            # Clear any open dialogs
+            st.session_state['show_quick_chart'] = False
+            st.session_state['show_compare_table'] = False
+            
             if is_multi_tf_view:
                 with st.spinner(f"🔄 Multi-TF scanning {len(watchlist['stocks'])} stocks..."):
                     analysis_data = analyze_watchlist_multi_tf(watchlist_id, duration_days=duration_days)
@@ -1948,13 +1952,31 @@ def show_watchlist_stocks_enhanced(watchlist_id):
             st.button("📊 Compare", key=f"compare_disabled_{watchlist_id}", disabled=True, use_container_width=True, help=help_text)
     
     with btn_col5:
+        # Quick Chart button - always enabled if watchlist has stocks
+        if len(watchlist['stocks']) > 0:
+            if st.button("📈 Chart", key=f"chart_btn_{watchlist_id}", use_container_width=True, help="Quick chart view"):
+                # If stocks selected, navigate only through selected stocks
+                # If no selection, navigate through all watchlist stocks
+                if selected_count >= 1:
+                    st.session_state['quick_chart_stocks'] = selected_symbols
+                    st.session_state['quick_chart_index'] = 0  # Start at first selected
+                else:
+                    all_symbols = [s.get('symbol', s) if isinstance(s, dict) else s for s in watchlist['stocks']]
+                    st.session_state['quick_chart_stocks'] = all_symbols
+                    st.session_state['quick_chart_index'] = 0  # Start at first in list
+                st.session_state['show_quick_chart'] = True
+                st.rerun()
+        else:
+            st.button("📈 Chart", key=f"chart_disabled_{watchlist_id}", disabled=True, use_container_width=True, help="Add stocks to watchlist first")
+    
+    with btn_col6:
         if selected_count == 1:
             if st.button("✏️ Edit", key=f"edit_btn_{watchlist_id}", use_container_width=True):
                 st.session_state[edit_mode_key] = True
         else:
             st.button("✏️ Edit", key=f"edit_disabled_{watchlist_id}", disabled=True, use_container_width=True)
     
-    with btn_col6:
+    with btn_col7:
         if selected_count > 0:
             if st.button(f"🗑️ ({selected_count})", key=f"delete_btn_{watchlist_id}", use_container_width=True, help=f"Delete {selected_count} selected stock(s)"):
                 for sym in selected_symbols:
@@ -2020,12 +2042,18 @@ def show_watchlist_stocks_enhanced(watchlist_id):
             for sym in all_symbols:
                 st.session_state[f"sel_{watchlist_id}_{sym}"] = True
             if not all_selected:  # Only rerun if state changed
+                # Clear dialogs before rerun
+                st.session_state['show_quick_chart'] = False
+                st.session_state['show_compare_table'] = False
                 st.rerun()
         else:
             # Deselect all (only if previously all were selected)
             if all_selected:
                 for sym in all_symbols:
                     st.session_state[f"sel_{watchlist_id}_{sym}"] = False
+                # Clear dialogs before rerun
+                st.session_state['show_quick_chart'] = False
+                st.session_state['show_compare_table'] = False
                 st.rerun()
     
     for idx, col_id in enumerate(columns_to_show):
@@ -2290,6 +2318,149 @@ def show_comparison_dialog():
 
 
 # ============================================================================
+# QUICK CHART DIALOG (NEW FEATURE)
+# ============================================================================
+
+@st.dialog("📈 Quick Chart", width="large")
+def show_quick_chart_dialog():
+    """Display quick chart popup with navigation arrows"""
+    
+    # Get watchlist stocks
+    if 'quick_chart_stocks' not in st.session_state or not st.session_state['quick_chart_stocks']:
+        st.warning("No stocks available")
+        if st.button("Close"):
+            st.rerun()
+        return
+    
+    stocks = st.session_state['quick_chart_stocks']
+    
+    # Initialize current index
+    if 'quick_chart_index' not in st.session_state:
+        st.session_state['quick_chart_index'] = 0
+    
+    # Ensure index is within bounds
+    current_idx = st.session_state['quick_chart_index']
+    if current_idx >= len(stocks):
+        current_idx = 0
+        st.session_state['quick_chart_index'] = 0
+    
+    current_symbol = stocks[current_idx]
+    
+    # Navigation row
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+    
+    with nav_col1:
+        if st.button("◀ Prev", key="chart_prev", use_container_width=True, disabled=(current_idx == 0)):
+            st.session_state['quick_chart_index'] = current_idx - 1
+            st.rerun()
+    
+    with nav_col2:
+        st.markdown(f"### &nbsp;&nbsp;&nbsp;{current_symbol}")
+        st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;Stock {current_idx + 1} of {len(stocks)}")
+    
+    with nav_col3:
+        if st.button("Next ▶", key="chart_next", use_container_width=True, disabled=(current_idx >= len(stocks) - 1)):
+            st.session_state['quick_chart_index'] = current_idx + 1
+            st.rerun()
+    
+    # Stock info from cache only (no fetch for speed)
+    cache_key = f"{current_symbol}_tr_data"
+    stock_info = st.session_state.get('stock_tr_cache', {}).get(cache_key, {})
+    
+    price = stock_info.get('price')
+    tr_status_raw = stock_info.get('tr_status', '')
+    
+    # Clean TR status - same cleaning as Watchlist view (remove EXIT, BUY markers, etc.)
+    tr_status_clean = ''
+    if tr_status_raw and tr_status_raw != 'N/A':
+        tr_status_clean = str(tr_status_raw)
+        
+        # Remove EXIT markers (any variation)
+        tr_status_clean = re.sub(r'🔴\s*EXIT\s*', '', tr_status_clean, flags=re.IGNORECASE)
+        tr_status_clean = re.sub(r'🔴\s*', '', tr_status_clean)
+        tr_status_clean = re.sub(r'\s+EXIT$', '', tr_status_clean, flags=re.IGNORECASE)
+        
+        # Remove colored circle emojis AND any "BUY" that follows them
+        tr_status_clean = re.sub(r'🟢\s*BUY\b', '', tr_status_clean, flags=re.IGNORECASE)
+        tr_status_clean = re.sub(r'🟢\s*', '', tr_status_clean)
+        tr_status_clean = re.sub(r'🟣\s*', '', tr_status_clean)
+        tr_status_clean = re.sub(r'🔵\s*', '', tr_status_clean)
+        tr_status_clean = re.sub(r'⚫\s*', '', tr_status_clean)
+        tr_status_clean = re.sub(r'⚪\s*', '', tr_status_clean)
+        
+        # Remove any stray bullet points or circles AND any "BUY" that follows them
+        tr_status_clean = re.sub(r'[●○•◦◉◎⬤]\s*BUY\b', '', tr_status_clean, flags=re.IGNORECASE)
+        tr_status_clean = re.sub(r'[●○•◦◉◎⬤]\s*', '', tr_status_clean)
+        
+        # Remove standalone "BUY" ONLY when it directly follows an enhancement signal
+        tr_status_clean = re.sub(r'([✓✔↑↓\*\+])\s+BUY\b', r'\1', tr_status_clean, flags=re.IGNORECASE)
+        
+        # Clean up multiple spaces and trim
+        tr_status_clean = re.sub(r'\s+', ' ', tr_status_clean).strip()
+    
+    # Build info line - only show if data exists
+    info_parts = []
+    
+    if price and price != 'N/A':
+        try:
+            price_str = f"${float(price):,.2f}"
+            info_parts.append(f"**Price:** {price_str}")
+        except:
+            pass
+    
+    if tr_status_clean:
+        # TR status with color
+        if 'Buy' in tr_status_clean:
+            tr_color = "🟢"
+        elif 'Sell' in tr_status_clean:
+            tr_color = "🔴"
+        else:
+            tr_color = "⚪"
+        info_parts.append(f"**TR Status:** {tr_color} {tr_status_clean}")
+    
+    if info_parts:
+        st.markdown(" | ".join(info_parts))
+    
+    st.divider()
+    
+    # TradingView Widget
+    tradingview_html = f'''
+    <div class="tradingview-widget-container" style="height:450px;width:100%;">
+      <div id="tradingview_chart" style="height:100%;width:100%;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "autosize": true,
+        "symbol": "{current_symbol}",
+        "interval": "D",
+        "timezone": "America/New_York",
+        "theme": "light",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "hide_top_toolbar": false,
+        "hide_legend": false,
+        "save_image": false,
+        "container_id": "tradingview_chart",
+        "hide_volume": false,
+        "studies": ["MASimple@tv-basicstudies"],
+        "show_popup_button": false,
+        "popup_width": "1000",
+        "popup_height": "650"
+      }});
+      </script>
+    </div>
+    '''
+    
+    import streamlit.components.v1 as components
+    components.html(tradingview_html, height=470)
+    
+    # Keyboard hint
+    st.caption("💡 Use Prev/Next buttons to navigate through watchlist stocks")
+
+
+# ============================================================================
 # MAIN APP
 # ============================================================================
 
@@ -2448,6 +2619,10 @@ def main():
             # Show comparison dialog if requested
             if st.session_state.get('show_compare_table', False):
                 show_comparison_dialog()
+            
+            # Show quick chart dialog if requested
+            if st.session_state.get('show_quick_chart', False):
+                show_quick_chart_dialog()
             
             show_add_stock_form(st.session_state.active_watchlist)
             show_watchlist_stocks_enhanced(st.session_state.active_watchlist)
