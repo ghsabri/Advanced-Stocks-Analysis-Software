@@ -92,11 +92,9 @@ with col2:
         - ⭐ **Watchlists**: Monitor stocks of interest
         - 🔔 **Alerts**: Get notified of important changes
         
-        **Three Service Tiers:**
+        **Two Service Tiers:**
         - **Commentary Only**: $9.99/month - Weekly market commentary and stock picks
-        - **Basic**: $29/month - Full software access, no AI
-        - **Pro**: $39/month - Everything + AI + Weekly picks
-        
+        - **Basic**: $25/month - Full software access, Everything + AI + Weekly picks        
         ---
         
         **Note**: Authentication system will be fully implemented in Week 9-10 of development.
@@ -130,12 +128,13 @@ with col2:
         - ✅ Technical indicators & signals
         - ✅ Support/Resistance levels
         - ✅ Profit & Stop Loss targets
+        - ✅ Watchlist Features with Quick Charts
+        - ✅ Daily Trading Guide
+                          
         
         ### 🔮 Coming Soon:
         - Portfolio Management
-        - Watchlist Features
         - Alert System
-        - Daily Trading Guide
         """)
         
         st.markdown("---")
